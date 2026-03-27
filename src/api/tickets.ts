@@ -1,8 +1,16 @@
 import api from './client';
 
 export const ticketsApi = {
-  list: (params?: Record<string, any>) =>
-    api.get('/tickets', { params }),
+  list: (params?: Record<string, any>) => {
+    // Boş string değerleri temizle
+    const cleaned: Record<string, any> = {};
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== '' && v !== null && v !== undefined) cleaned[k] = v;
+      });
+    }
+    return api.get('/tickets', { params: cleaned });
+  },
 
   get: (id: string) =>
     api.get(`/tickets/${id}`),
