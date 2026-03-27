@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --bg-card: #ffffff;
+  --border: #e5e7eb;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+}
+
+html.dark {
+  --bg-primary: #030712;
+  --bg-secondary: #111827;
+  --bg-card: #111827;
+  --border: #1f2937;
+  --text-primary: #f9fafb;
+  --text-secondary: #9ca3af;
+}
+
+body, #root {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
