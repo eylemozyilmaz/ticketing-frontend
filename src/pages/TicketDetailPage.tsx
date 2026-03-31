@@ -257,6 +257,14 @@ function ForwardModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void
     enabled: !!ticket.projectId,
     staleTime: 300_000,
   });
+  // Proje üyelerini çek
+  const { data: membersRes } = useQuery({
+    queryKey: ['project-members', ticket.projectId],
+    queryFn: () => api.get(`/projects/${ticket.projectId}/members`),
+    enabled: !!ticket.projectId,
+    staleTime: 300_000,
+  });
+  const members: any[] = membersRes?.data?.data ?? [];
   const departments: any[] = projectRes?.data?.data ?? [];
 
   const mutation = useMutation({
@@ -297,14 +305,16 @@ function ForwardModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void
         />
       )}
 
-      {/* Kullanıcı ID (opsiyonel) */}
-      <label style={{ ...labelStyle, marginTop: 12 }}>Kullanıcı ID (opsiyonel)</label>
-      <input
-        value={toUserId}
-        onChange={e => setToUserId(e.target.value)}
-        placeholder="Doğrudan kullanıcıya atamak için"
-        style={inputStyle}
-      />
+      {/* Kullanıcı seçimi (opsiyonel) */}
+      <label style={{ ...labelStyle, marginTop: 12 }}>Agent (opsiyonel)</label>
+      <select value={toUserId} onChange={e => setToUserId(e.target.value)} style={inputStyle}>
+        <option value="">— Seçin —</option>
+        {members.map((m: any) => (
+          <option key={m.user?.id ?? m.userId} value={m.user?.id ?? m.userId}>
+            {m.user?.firstName} {m.user?.lastName} ({m.role})
+          </option>
+        ))}
+      </select>
 
       {/* Not */}
       <label style={{ ...labelStyle, marginTop: 12 }}>Not (opsiyonel)</label>
