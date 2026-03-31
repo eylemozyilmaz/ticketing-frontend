@@ -25,7 +25,6 @@ import {
 import api from '../api/client';
 import { ticketsApi } from '../api/tickets';
 import { useAuthStore } from '../store/auth.store';
-import DOMPurify from 'dompurify';
 import { useProjectStore } from '../store/project.store';
 
 // ─────────────────────────────────────────────
@@ -276,11 +275,11 @@ function ForwardModal({ ticket, onClose }: { ticket: any; onClose: () => void })
   // Projedeki departmanları çek
   const { data: projectRes } = useQuery({
     queryKey: ['project', ticket.projectId],
-    queryFn: () => api.get(`/projects/${ticket.projectId}/departments`),
+    queryFn: () => api.get(`/projects/${ticket.projectId}`),
     enabled: !!ticket.projectId,
     staleTime: 300_000,
   });
-  const departments: any[] = projectRes?.data?.data ?? [];
+  const departments: any[] = projectRes?.data?.data?.departments ?? [];
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -343,7 +342,7 @@ function ForwardModal({ ticket, onClose }: { ticket: any; onClose: () => void })
       {error && (
         <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: '#ef444415', border: '1px solid #ef444430', fontSize: 12, color: '#ef4444' }}>
           {error}
-        </div>
+nano /workspaces/ticketing-frontend/src/pages/TicketDetailPage.tsxnano /workspaces/ticketing-frontend/src/pages/TicketDetailPage.tsx        </div>
       )}
 
       <button
@@ -1436,7 +1435,7 @@ function MessageItem({ msg }: { msg: any }) {
         <div style={{ padding: '4px 14px 14px' }}>
           {msg.bodyHtml ? (
             <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6 }}
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.bodyHtml) }} />
+              dangerouslySetInnerHTML={{ __html: msg.bodyHtml }} />
           ) : (
             <pre style={{ fontSize: 13, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: 1.6, margin: 0 }}>
               {msg.bodyText || msg.body_text}
@@ -2035,7 +2034,6 @@ export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
-  const { projectRole } = useProjectStore();
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
   const { data: ticketRes, isLoading, isError } = useQuery({
@@ -2073,7 +2071,7 @@ export default function TicketDetailPage() {
   }, [ticket?.id]);
 
   const canEdit = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' ||
-    user?.role === 'SUPERVISOR' || projectRole === 'ADMIN' || projectRole === 'SUPERVISOR' ||
+    user?.role === 'SUPERVISOR' ||
     ticket?.assigneeId === user?.id ||
     ticket?.ownerId === user?.id;
 
