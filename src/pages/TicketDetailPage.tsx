@@ -252,7 +252,7 @@ function ForwardModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void
 
   // Projedeki departmanları çek
   const { data: projectRes } = useQuery({
-    queryKey: ['project', ticket.projectId],
+    queryKey: ['project-departments', ticket.projectId],
     queryFn: () => api.get(`/projects/${ticket.projectId}/departments`),
     enabled: !!ticket.projectId,
     staleTime: 300_000,
@@ -1442,11 +1442,16 @@ function MessageItem({ msg }: { msg: TicketMessage }) {
 function ReplyEditor({ ticket }: { ticket: Ticket }) {
   const [mode, setMode] = useState<'reply' | 'internal'>('reply');
   const [draft, setDraft] = useState('');
+  const [cc, setCc] = useState('');
   const qc = useQueryClient();
   const isChild = ticket.isChild || ticket.is_child;
 
   const sendMutation = useMutation({
-    mutationFn: () => ticketsApi.addMessage(ticket.id, { bodyText: draft, isInternal: mode === 'internal' }),
+    mutationFn: () => ticketsApi.addMessage(ticket.id, {
+      bodyText: draft,
+      isInternal: mode === 'internal',
+      ccAddresses: (mode === 'reply' && cc.trim()) ? cc.trim() : undefined,
+    }),
     onMutate: async () => {
       const optimistic = { id: `opt-${Date.now()}`, direction: 'OUTBOUND', bodyText: draft, isInternal: mode === 'internal', createdAt: new Date().toISOString(), status: 'sending' };
       qc.setQueryData(['ticket-messages', ticket.id], (old: any) => {
@@ -1480,6 +1485,18 @@ function ReplyEditor({ ticket }: { ticket: Ticket }) {
       {isChild && mode === 'reply' && (
         <div style={{ padding: '8px 14px', background: '#f59e0b10', borderBottom: '1px solid #f59e0b30', fontSize: 11, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 6 }}>
           <AlertTriangle size={12} /> Child ticket'larda müşteriye doğrudan yanıt gönderilemez. İç not kullanın.
+        </div>
+      )}
+
+      {mode === 'reply' && !isChild && (
+        <div style={{ padding: '6px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--text-secondary)', flexShrink: 0 }}>CC:</span>
+          <input
+            value={cc}
+            onChange={e => setCc(e.target.value)}
+            placeholder="ornek@email.com, diger@email.com"
+            style={{ flex: 1, border: 'none', outline: 'none', fontSize: 12, color: 'var(--text-primary)', background: 'transparent' }}
+          />
         </div>
       )}
 
