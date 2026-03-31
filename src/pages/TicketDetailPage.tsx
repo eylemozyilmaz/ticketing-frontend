@@ -491,7 +491,7 @@ function SplitModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void }
     } else {
       setParentStatusId(ticket.statusId);
     }
-  }, [statuses]);
+  }, [statuses, ticket.statusId, parentStatusId]);
 
   const addChild = () => {
     setChildren(prev => [...prev, { id: Date.now(), subject: ticket.subject ?? '', assigneeId: '', departmentId: '' }]);
