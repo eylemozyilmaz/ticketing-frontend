@@ -1439,10 +1439,10 @@ function MessageItem({ msg }: { msg: TicketMessage }) {
 // ORTA PANEL: YANIT EDİTÖRÜ
 // ─────────────────────────────────────────────
 
-function ReplyEditor({ ticket }: { ticket: Ticket }) {
+function ReplyEditor({ ticket, initialCc = '' }: { ticket: Ticket; initialCc?: string }) {
   const [mode, setMode] = useState<'reply' | 'internal'>('reply');
   const [draft, setDraft] = useState('');
-  const [cc, setCc] = useState('');
+  const [cc, setCc] = useState(initialCc);
   const qc = useQueryClient();
   const isChild = ticket.isChild || ticket.is_child;
 
@@ -1716,7 +1716,11 @@ function ThreadPanel({ ticket, messages }: { ticket: Ticket; messages: TicketMes
       </div>
 
       <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)' }}>
-        <ReplyEditor ticket={ticket} />
+        <ReplyEditor ticket={ticket} initialCc={
+          [...messages].reverse().find(m => m.direction === 'INBOUND' && (m as any).ccAddresses)
+            ? (messages).slice().reverse().find(m => m.direction === 'INBOUND' && (m as any).ccAddresses)?.['ccAddresses'] ?? ''
+            : ''
+        } />
       </div>
     </div>
   );
