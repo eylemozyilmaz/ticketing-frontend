@@ -2,52 +2,79 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { ticketsApi } from '../api/tickets';
+import { useAuthStore } from '../store/auth.store';
+import { useProjectStore } from '../store/project.store';
+import api from '../api/client';
 
 const priorityColors: Record<string, string> = {
-  LOW: '#22c55e',
-  NORMAL: '#6366f1',
-  HIGH: '#f59e0b',
-  URGENT: '#ef4444',
+  LOW: '#22c55e', NORMAL: '#6366f1', HIGH: '#f59e0b', URGENT: '#ef4444',
 };
-
 const priorityLabels: Record<string, string> = {
-  LOW: 'Düşük',
-  NORMAL: 'Normal',
-  HIGH: 'Yüksek',
-  URGENT: 'Acil',
+  LOW: 'Düşük', NORMAL: 'Normal', HIGH: 'Yüksek', URGENT: 'Acil',
 };
 
 export default function TicketsPage() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const { currentProject } = useProjectStore();
+
   const [search, setSearch] = useState('');
   const [priority, setPriority] = useState('');
+  const [projectFilter, setProjectFilter] = useState('all'); // 'all' | projectId
+  const [assigneeFilter, setAssigneeFilter] = useState(''); // '' | userId
   const [page, setPage] = useState(1);
 
+  // Kullanıcının tüm projeleri
+  const { data: projectsRes } = useQuery({
+    queryKey: ['my-projects'],
+    queryFn: () => api.get('/users/me/projects'),
+    staleTime: 60_000,
+  });
+  const myProjects: any[] = projectsRes?.data?.data ?? projectsRes?.data ?? [];
+
+  // Ticket listesi
   const { data, isLoading } = useQuery({
-    queryKey: ['tickets', { search, priority, page }],
-    queryFn: () => ticketsApi.list({ search, priority, page, limit: 25 }),
+    queryKey: ['tickets', { search, priority, page, projectFilter, assigneeFilter }],
+    queryFn: () => ticketsApi.list({
+      search: search || undefined,
+      priority: priority || undefined,
+      page,
+      limit: 25,
+      projectId: projectFilter !== 'all' ? projectFilter : undefined,
+      assigneeId: assigneeFilter || undefined,
+    }),
   });
 
   const tickets = data?.data?.data || [];
   const meta = data?.data?.meta;
 
+  const resetPage = () => setPage(1);
+
   return (
-    <div className="p-8">
+    <div style={{ padding: 32 }}>
       {/* Başlık */}
-      <div className="flex items-center justify-between mb-6">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-            Ticketlar
-          </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>Ticketlar</h1>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
             {meta?.total ?? '—'} ticket
+            {projectFilter !== 'all' && (
+              <span style={{ marginLeft: 8, fontSize: 11, color: '#6366f1', background: '#6366f115', padding: '1px 8px', borderRadius: 999 }}>
+                {myProjects.find(p => p.id === projectFilter)?.name}
+              </span>
+            )}
+            {assigneeFilter === user?.id && (
+              <span style={{ marginLeft: 6, fontSize: 11, color: '#10b981', background: '#10b98115', padding: '1px 8px', borderRadius: 999 }}>
+                Bana atanan
+              </span>
+            )}
           </p>
         </div>
         <button
           onClick={() => navigate('/tickets/new')}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition"
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#6366f1', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg style={{ width: 16, height: 16 }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           Yeni Ticket
@@ -55,28 +82,37 @@ export default function TicketsPage() {
       </div>
 
       {/* Filtreler */}
-      <div className="flex gap-3 mb-6">
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+        {/* Arama */}
         <input
           type="text"
-          placeholder="Ticket ara..."
+          placeholder="Ticket ara... (konu veya no)"
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="flex-1 px-4 py-2 rounded-lg border text-sm"
+          onChange={e => { setSearch(e.target.value); resetPage(); }}
           style={{
-            backgroundColor: 'var(--bg-card)',
-            borderColor: 'var(--border)',
-            color: 'var(--text-primary)',
+            flex: '1 1 200px', padding: '8px 12px', borderRadius: 8,
+            border: '1px solid var(--border)', fontSize: 13,
+            background: 'var(--bg-card)', color: 'var(--text-primary)', outline: 'none',
           }}
         />
+
+        {/* Proje filtresi */}
+        <select
+          value={projectFilter}
+          onChange={e => { setProjectFilter(e.target.value); resetPage(); }}
+          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer' }}
+        >
+          <option value="all">Tüm Projeler</option>
+          {myProjects.map((p: any) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+
+        {/* Öncelik */}
         <select
           value={priority}
-          onChange={(e) => { setPriority(e.target.value); setPage(1); }}
-          className="px-4 py-2 rounded-lg border text-sm"
-          style={{
-            backgroundColor: 'var(--bg-card)',
-            borderColor: 'var(--border)',
-            color: 'var(--text-primary)',
-          }}
+          onChange={e => { setPriority(e.target.value); resetPage(); }}
+          style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer' }}
         >
           <option value="">Tüm Öncelikler</option>
           <option value="URGENT">Acil</option>
@@ -84,32 +120,47 @@ export default function TicketsPage() {
           <option value="NORMAL">Normal</option>
           <option value="LOW">Düşük</option>
         </select>
+
+        {/* Bana atanan */}
+        <button
+          onClick={() => { setAssigneeFilter(f => f === user?.id ? '' : (user?.id ?? '')); resetPage(); }}
+          style={{
+            padding: '8px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+            border: `1px solid ${assigneeFilter === user?.id ? '#10b981' : 'var(--border)'}`,
+            background: assigneeFilter === user?.id ? '#10b98115' : 'var(--bg-card)',
+            color: assigneeFilter === user?.id ? '#10b981' : 'var(--text-secondary)',
+            cursor: 'pointer',
+          }}
+        >
+          Bana Atanan
+        </button>
       </div>
 
       {/* Tablo */}
-      <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
-        <table className="w-full text-sm">
+      <div style={{ borderRadius: 12, border: '1px solid var(--border)', overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ backgroundColor: 'var(--bg-secondary)', borderBottom: `1px solid var(--border)` }}>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>Ticket No</th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>Konu</th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>Müşteri</th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>Atanan</th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>Statü</th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>Öncelik</th>
-              <th className="text-left px-4 py-3 font-medium" style={{ color: 'var(--text-secondary)' }}>Tarih</th>
+            <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+              <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ticket No</th>
+              <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Konu</th>
+              <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Proje</th>
+              <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Müşteri</th>
+              <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Atanan</th>
+              <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Statü</th>
+              <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Öncelik</th>
+              <th style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tarih</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="text-center py-12" style={{ color: 'var(--text-secondary)' }}>
-                  Yükleniyor...
+                <td colSpan={8} style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-secondary)' }}>
+                  Yükleniyor…
                 </td>
               </tr>
             ) : tickets.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-12" style={{ color: 'var(--text-secondary)' }}>
+                <td colSpan={8} style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-secondary)' }}>
                   Ticket bulunamadı
                 </td>
               </tr>
@@ -118,47 +169,49 @@ export default function TicketsPage() {
                 <tr
                   key={ticket.id}
                   onClick={() => navigate(`/tickets/${ticket.id}`)}
-                  className="cursor-pointer transition"
-                  style={{ borderBottom: `1px solid var(--border)`, backgroundColor: 'var(--bg-card)' }}
-                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--bg-secondary)')}
-                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'var(--bg-card)')}
+                  style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-card)', cursor: 'pointer' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-card)'}
                 >
-                  <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontSize: 11, color: 'var(--text-secondary)' }}>
                     {ticket.ticketNo}
                   </td>
-                  <td className="px-4 py-3 font-medium max-w-xs truncate" style={{ color: 'var(--text-primary)' }}>
+                  <td style={{ padding: '10px 14px', fontWeight: 500, color: 'var(--text-primary)', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {ticket.subject}
                   </td>
-                  <td className="px-4 py-3" style={{ color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '10px 14px' }}>
+                    {ticket.project ? (
+                      <span style={{ fontSize: 11, color: '#6366f1', background: '#6366f115', border: '1px solid #6366f130', padding: '2px 8px', borderRadius: 999 }}>
+                        {ticket.project.name}
+                      </span>
+                    ) : '—'}
+                  </td>
+                  <td style={{ padding: '10px 14px', color: 'var(--text-secondary)', fontSize: 12 }}>
                     {ticket.customer?.name || ticket.customer?.email || '—'}
                   </td>
-                  <td className="px-4 py-3" style={{ color: 'var(--text-secondary)' }}>
-                    {ticket.assignee
-                      ? `${ticket.assignee.firstName} ${ticket.assignee.lastName}`
-                      : '—'}
+                  <td style={{ padding: '10px 14px', color: 'var(--text-secondary)', fontSize: 12 }}>
+                    {ticket.assignee ? `${ticket.assignee.firstName} ${ticket.assignee.lastName}` : (
+                      <span style={{ fontStyle: 'italic', color: 'var(--text-secondary)' }}>Atanmamış</span>
+                    )}
                   </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
-                      style={{
-                        backgroundColor: `${ticket.status?.color}20`,
-                        color: ticket.status?.color,
-                      }}
-                    >
-                      {ticket.status?.name}
-                    </span>
+                  <td style={{ padding: '10px 14px' }}>
+                    {ticket.status && (
+                      <span style={{
+                        fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 999,
+                        background: `${ticket.status.color}22`, color: ticket.status.color,
+                        border: `1px solid ${ticket.status.color}44`,
+                      }}>
+                        {ticket.status.name}
+                      </span>
+                    )}
                   </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className="inline-flex items-center gap-1 text-xs font-medium"
-                      style={{ color: priorityColors[ticket.priority] }}
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: priorityColors[ticket.priority] }} />
+                  <td style={{ padding: '10px 14px' }}>
+                    <span style={{ fontSize: 11, fontWeight: 500, color: priorityColors[ticket.priority], display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: priorityColors[ticket.priority], flexShrink: 0 }} />
                       {priorityLabels[ticket.priority]}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  <td style={{ padding: '10px 14px', fontSize: 11, color: 'var(--text-secondary)' }}>
                     {new Date(ticket.createdAt).toLocaleDateString('tr-TR')}
                   </td>
                 </tr>
@@ -170,24 +223,25 @@ export default function TicketsPage() {
 
       {/* Pagination */}
       {meta && meta.totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            {meta.total} kayıttan {(page - 1) * 25 + 1}-{Math.min(page * 25, meta.total)} arası
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            {meta.total} kayıttan {(page - 1) * 25 + 1}–{Math.min(page * 25, meta.total)} arası
           </p>
-          <div className="flex gap-2">
+          <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-50 transition"
-              style={{ borderColor: 'var(--border)', color: 'var(--text-primary)', backgroundColor: 'var(--bg-card)' }}
+              style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: page === 1 ? 'not-allowed' : 'pointer', opacity: page === 1 ? 0.5 : 1 }}
             >
               ← Önceki
             </button>
+            <span style={{ padding: '6px 12px', fontSize: 13, color: 'var(--text-secondary)' }}>
+              {page} / {meta.totalPages}
+            </span>
             <button
               onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
               disabled={page === meta.totalPages}
-              className="px-3 py-1.5 rounded-lg border text-sm disabled:opacity-50 transition"
-              style={{ borderColor: 'var(--border)', color: 'var(--text-primary)', backgroundColor: 'var(--bg-card)' }}
+              style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: page === meta.totalPages ? 'not-allowed' : 'pointer', opacity: page === meta.totalPages ? 0.5 : 1 }}
             >
               Sonraki →
             </button>
@@ -197,3 +251,4 @@ export default function TicketsPage() {
     </div>
   );
 }
+
