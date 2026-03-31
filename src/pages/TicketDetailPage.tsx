@@ -25,6 +25,7 @@ import {
 import api from '../api/client';
 import { ticketsApi } from '../api/tickets';
 import { useAuthStore } from '../store/auth.store';
+import type { Ticket, TicketMessage, TicketResolution, TicketAttachment, ApprovalRequest, Department, Category, CustomField, CustomValue } from '../types/ticket.types';
 import DOMPurify from 'dompurify';
 import { useProjectStore } from '../store/project.store';
 
@@ -242,7 +243,7 @@ function ModalShell({ title, onClose, children }: {
 // MODAL: FORWARD
 // ─────────────────────────────────────────────
 
-function ForwardModal({ ticket, onClose }: { ticket: any; onClose: () => void }) {
+function ForwardModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void }) {
   const qc = useQueryClient();
   const [toDeptId, setToDeptId] = useState('');
   const [toUserId, setToUserId] = useState('');
@@ -340,7 +341,7 @@ function ForwardModal({ ticket, onClose }: { ticket: any; onClose: () => void })
 // MODAL: KAPAT
 // ─────────────────────────────────────────────
 
-function CloseModal({ ticket, onClose }: { ticket: any; onClose: () => void }) {
+function CloseModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void }) {
   const qc = useQueryClient();
   const [outcome, setOutcome] = useState('SATISFIED');
   const [note, setNote] = useState('');
@@ -441,7 +442,7 @@ interface SplitChild {
   departmentId: string;
 }
 
-function SplitModal({ ticket, onClose }: { ticket: any; onClose: () => void }) {
+function SplitModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void }) {
   const qc = useQueryClient();
   const [children, setChildren] = useState<SplitChild[]>([
     { id: 1, subject: ticket.subject ?? '', assigneeId: '', departmentId: '' },
@@ -637,7 +638,7 @@ function SplitModal({ ticket, onClose }: { ticket: any; onClose: () => void }) {
 // MODAL: MERGE
 // ─────────────────────────────────────────────
 
-function MergeModal({ ticket, onClose }: { ticket: any; onClose: () => void }) {
+function MergeModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void }) {
   const qc = useQueryClient();
   const [targetId, setTargetId] = useState('');
   const [note, setNote] = useState('');
@@ -749,7 +750,7 @@ function MergeModal({ ticket, onClose }: { ticket: any; onClose: () => void }) {
 // MODAL: TRANSFER
 // ─────────────────────────────────────────────
 
-function TransferModal({ ticket, onClose }: { ticket: any; onClose: () => void }) {
+function TransferModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void }) {
   const qc = useQueryClient();
   const [toProjectId, setToProjectId] = useState('');
   const [note, setNote] = useState('');
@@ -861,7 +862,7 @@ function TransferModal({ ticket, onClose }: { ticket: any; onClose: () => void }
 // MODAL: RESOLUTION (Çözüm Seti)
 // ─────────────────────────────────────────────
 
-function ResolutionModal({ ticket, onClose }: { ticket: any; onClose: () => void }) {
+function ResolutionModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void }) {
   const qc = useQueryClient();
   const [resolutionTypeId, setResolutionTypeId] = useState('');
   const [description, setDescription] = useState('');
@@ -1002,7 +1003,7 @@ function PlaceholderModal({ type, onClose }: { type: string; onClose: () => void
 // SOL PANEL: MÜŞTERİ + ERP + ATAMA
 // ─────────────────────────────────────────────
 
-function CustomerPanel({ ticket }: { ticket: any }) {
+function CustomerPanel({ ticket }: { ticket: Ticket }) {
   const { statuses } = useProjectStore();
   const qc = useQueryClient();
   const [erpOpen, setErpOpen] = useState(false);
@@ -1265,7 +1266,7 @@ function CustomerPanel({ ticket }: { ticket: any }) {
 // SOL PANEL: ÖZEL ALANLAR
 // ─────────────────────────────────────────────
 
-function CustomFieldsPanel({ ticket }: { ticket: any }) {
+function CustomFieldsPanel({ ticket }: { ticket: Ticket }) {
   const qc = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -1377,7 +1378,7 @@ function CustomFieldsPanel({ ticket }: { ticket: any }) {
 // ORTA PANEL: MESAJ ÖGESİ
 // ─────────────────────────────────────────────
 
-function MessageItem({ msg }: { msg: any }) {
+function MessageItem({ msg }: { msg: TicketMessage }) {
   const [expanded, setExpanded] = useState(true);
   const isInternal = msg.isInternal || msg.is_internal;
   const isOutbound = msg.direction === 'OUTBOUND' || msg.direction === 'outbound';
@@ -1428,7 +1429,7 @@ function MessageItem({ msg }: { msg: any }) {
 // ORTA PANEL: YANIT EDİTÖRÜ
 // ─────────────────────────────────────────────
 
-function ReplyEditor({ ticket }: { ticket: any }) {
+function ReplyEditor({ ticket }: { ticket: Ticket }) {
   const [mode, setMode] = useState<'reply' | 'internal'>('reply');
   const [draft, setDraft] = useState('');
   const qc = useQueryClient();
@@ -1665,7 +1666,7 @@ function CategoryPanel({ ticketId, projectId }: { ticketId: string; projectId: s
   );
 }
 
-function ThreadPanel({ ticket, messages }: { ticket: any; messages: any[] }) {
+function ThreadPanel({ ticket, messages }: { ticket: Ticket; messages: TicketMessage[] }) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -1929,7 +1930,7 @@ function ApprovalsWidget({ ticketId }: { ticketId: string }) {
 // SAĞ PANEL: AKSİYONLAR
 // ─────────────────────────────────────────────
 
-function ActionPanel({ ticket, onModal }: { ticket: any; onModal: (m: string) => void }) {
+function ActionPanel({ ticket, onModal }: { ticket: Ticket; onModal: (m: string) => void }) {
   const qc = useQueryClient();
   const isForwarded = ticket.isForwarded || ticket.is_forwarded;
 
