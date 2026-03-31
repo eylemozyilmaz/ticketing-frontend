@@ -99,30 +99,6 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 // ─────────────────────────────────────────────
-// EK API ÇAĞRILARI
-// (tickets.ts'e taşımak için hazır — şimdilik burada)
-// ─────────────────────────────────────────────
-
-const extApi = {
-  getSla: (id: string) => api.get(`/tickets/${id}/sla`),
-  getAttachments: (id: string) => api.get(`/tickets/${id}/attachments`),
-  addAttachment: (id: string, formData: FormData) =>
-    api.post(`/tickets/${id}/attachments`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
-  getApprovals: (id: string) => api.get(`/tickets/${id}/approvals`),
-  getTicketCategories: (id: string) => api.get(`/tickets/${id}/categories`),
-  addCategory: (id: string, categoryId: string) =>
-    api.post(`/tickets/${id}/categories`, { categoryId }),
-  removeCategory: (id: string, categoryId: string) =>
-    api.delete(`/tickets/${id}/categories/${categoryId}`),
-  getErpActiveContract: (erpId: string) =>
-    api.get(`/erp/customers/${erpId}/active-contract`),
-  getErpContracts: (erpId: string) =>
-    api.get(`/erp/customers/${erpId}/contracts`),
-};
-
-// ─────────────────────────────────────────────
 // KÜÇÜK YARDIMCI BİLEŞENLER
 // ─────────────────────────────────────────────
 
@@ -1036,14 +1012,14 @@ function CustomerPanel({ ticket }: { ticket: any }) {
 
   const { data: activeContractRes, isLoading: contractLoading } = useQuery({
     queryKey: ['erp-active', erpId],
-    queryFn: () => extApi.getErpActiveContract(erpId!),
+    queryFn: () => api.get(`/erp/customers/${erpId}/active-contract`); //erpId!),
     enabled: !!erpId && erpOpen,
     staleTime: 0,
   });
 
   const { data: allContractsRes, isLoading: allLoading } = useQuery({
     queryKey: ['erp-contracts', erpId],
-    queryFn: () => extApi.getErpContracts(erpId!),
+    queryFn: () => api.get(`/erp/customers/${erpId}/contracts`); //erpId!),
     enabled: !!erpId && showAllContracts,
     staleTime: 0,
   });
@@ -1532,7 +1508,7 @@ function CategoryPickerModal({ ticketId, projectId, onClose }: { ticketId: strin
   const topLevel: any[] = catRes?.data?.data ?? catRes?.data ?? [];
 
   const addMutation = useMutation({
-    mutationFn: (categoryId: string) => extApi.addCategory(ticketId, categoryId),
+    mutationFn: (categoryId: string) => ticketsApi.addCategory(ticketId, categoryId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['ticket-categories', ticketId] });
       onClose();
@@ -1651,12 +1627,12 @@ function CategoryPanel({ ticketId, projectId }: { ticketId: string; projectId: s
 
   const { data: res } = useQuery({
     queryKey: ['ticket-categories', ticketId],
-    queryFn: () => extApi.getTicketCategories(ticketId),
+    queryFn: () => ticketsApi.getCategories(ticketId),
   });
   const assigned: any[] = res?.data?.data ?? [];
 
   const removeMutation = useMutation({
-    mutationFn: (catId: string) => extApi.removeCategory(ticketId, catId),
+    mutationFn: (catId: string) => ticketsApi.removeCategory(ticketId, catId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ticket-categories', ticketId] }),
   });
 
@@ -1725,7 +1701,7 @@ function ThreadPanel({ ticket, messages }: { ticket: any; messages: any[] }) {
 function SlaWidget({ ticketId }: { ticketId: string }) {
   const { data: res } = useQuery({
     queryKey: ['ticket-sla', ticketId],
-    queryFn: () => extApi.getSla(ticketId),
+    queryFn: () => ticketsApi.getSla(ticketId),
     staleTime: 60_000,
     refetchInterval: 60_000,
   });
@@ -1771,14 +1747,14 @@ function AttachmentsWidget({ ticketId }: { ticketId: string }) {
 
   const { data: res } = useQuery({
     queryKey: ['ticket-attachments', ticketId],
-    queryFn: () => extApi.getAttachments(ticketId),
+    queryFn: () => ticketsApi.getAttachments(ticketId),
   });
   const attachments: any[] = res?.data?.data ?? [];
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) => {
       const fd = new FormData(); fd.append('file', file);
-      return extApi.addAttachment(ticketId, fd);
+      return ticketsApi.addAttachment(ticketId, fd);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['ticket-attachments', ticketId] }),
   });
@@ -1916,7 +1892,7 @@ function ResolutionsWidget({ ticketId }: { ticketId: string }) {
 function ApprovalsWidget({ ticketId }: { ticketId: string }) {
   const { data: res } = useQuery({
     queryKey: ['ticket-approvals', ticketId],
-    queryFn: () => extApi.getApprovals(ticketId),
+    queryFn: () => ticketsApi.getApprovals(ticketId),
   });
   const approvals: any[] = res?.data?.data ?? [];
   if (approvals.length === 0) return null;
