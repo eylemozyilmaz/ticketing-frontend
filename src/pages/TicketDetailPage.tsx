@@ -1023,14 +1023,14 @@ function CustomerPanel({ ticket }: { ticket: Ticket }) {
 
   const { data: activeContractRes, isLoading: contractLoading } = useQuery({
     queryKey: ['erp-active', erpId],
-    queryFn: () => api.get(`/erp/customers/${erpId}/active-contract`); //erpId!),
+    queryFn: () => api.get(`/erp/customers/${erpId}/active-contract`),
     enabled: !!erpId && erpOpen,
     staleTime: 0,
   });
 
   const { data: allContractsRes, isLoading: allLoading } = useQuery({
     queryKey: ['erp-contracts', erpId],
-    queryFn: () => api.get(`/erp/customers/${erpId}/contracts`); //erpId!),
+    queryFn: () => api.get(`/erp/customers/${erpId}/contracts`),
     enabled: !!erpId && showAllContracts,
     staleTime: 0,
   });
