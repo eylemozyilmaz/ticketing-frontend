@@ -1634,19 +1634,23 @@ function ReplyEditor({ ticket, initialCc = '', replyToMsg, onSent }: {
   const [mode, setMode] = useState<'reply' | 'internal'>('reply');
   const [draft, setDraft] = useState('');
   const [cc, setCc] = useState(initialCc);
+  const [files, setFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const qc = useQueryClient();
   const isChild = ticket.isChild || ticket.is_child;
 
-  // replyToMsg degisince cc guncelle
   useEffect(() => { setCc(initialCc); }, [initialCc]);
 
   const sendMutation = useMutation({
-    mutationFn: () => ticketsApi.addMessage(ticket.id, {
-      bodyText: draft,
-      isInternal: mode === 'internal',
-      ccAddresses: (mode === 'reply' && cc.trim()) ? cc.trim() : undefined,
-      inReplyToHeader: replyToMsg?.messageIdHeader || undefined,
-    }),
+    mutationFn: () => {
+      const fd = new FormData();
+      if (draft) fd.append('bodyText', draft);
+      fd.append('isInternal', mode === 'internal' ? 'true' : 'false');
+      if (mode === 'reply' && cc.trim()) fd.append('ccAddresses', cc.trim());
+      if (replyToMsg?.messageIdHeader) fd.append('inReplyToHeader', replyToMsg.messageIdHeader);
+      files.forEach(f => fd.append('files', f));
+      return ticketsApi.addMessage(ticket.id, fd as any);
+    },
     onMutate: async () => {
       const optimistic = { id: `opt-${Date.now()}`, direction: 'OUTBOUND', bodyText: draft, isInternal: mode === 'internal', createdAt: new Date().toISOString(), status: 'sending' };
       qc.setQueryData(['ticket-messages', ticket.id], (old: any) => {
@@ -1658,7 +1662,9 @@ function ReplyEditor({ ticket, initialCc = '', replyToMsg, onSent }: {
     onSuccess: () => {
       setDraft('');
       setCc('');
+      setFiles([]);
       qc.invalidateQueries({ queryKey: ['ticket-messages', ticket.id] });
+      qc.invalidateQueries({ queryKey: ['ticket-attachments', ticket.id] });
       onSent?.();
     },
     onError: (_err: any, _vars: any, ctx: any) => {
@@ -1709,8 +1715,33 @@ function ReplyEditor({ ticket, initialCc = '', replyToMsg, onSent }: {
         style={{ width: '100%', padding: '12px 14px', resize: 'none', border: 'none', fontSize: 13, color: 'var(--text-primary)', background: 'transparent', outline: 'none', lineHeight: 1.6, boxSizing: 'border-box' }}
       />
 
+      {/* Eklenen dosyalar */}
+      {files.length > 0 && (
+        <div style={{ padding: '6px 14px', borderTop: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {files.map((f, i) => (
+            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+              <Paperclip size={10} />
+              {f.name}
+              <button onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', padding: 0 }}>
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', borderTop: '1px solid var(--border)' }}>
-        <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{draft.length > 0 ? `${draft.length} karakter` : ''}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={() => fileInputRef.current?.click()}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '4px 6px', borderRadius: 6 }}
+            title="Dosya ekle">
+            <Paperclip size={13} />
+          </button>
+          <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }}
+            onChange={e => { setFiles(prev => [...prev, ...Array.from(e.target.files || [])]); e.target.value = ''; }} />
+          <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{draft.length > 0 ? `${draft.length} karakter` : ''}</span>
+        </div>
         <button onClick={() => sendMutation.mutate()}
           disabled={!draft.trim() || sendMutation.isPending || (isChild && mode === 'reply')}
           style={{ padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#fff', background: mode === 'internal' ? '#f59e0b' : '#6366f1', opacity: (!draft.trim() || (isChild && mode === 'reply')) ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
