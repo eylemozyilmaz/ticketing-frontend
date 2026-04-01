@@ -1090,7 +1090,7 @@ function DepartmentsSection({ projectId }: { projectId: string }) {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '', slug: '', type: 'INTERNAL_DEPARTMENT',
-    notificationEmail: '', linkedProjectId: '', sortOrder: '0',
+    notificationEmail: '', linkedProjectId: '', sortOrder: '0', sendNotification: false,
   });
 
   const { data: res } = useQuery({
@@ -1120,6 +1120,7 @@ function DepartmentsSection({ projectId }: { projectId: string }) {
       notificationEmail: d.notificationEmail ?? '',
       linkedProjectId: d.linkedProjectId ?? '',
       sortOrder: String(d.sortOrder ?? 0),
+      sendNotification: d.sendNotification ?? false,
     });
     setEditId(d.id);
     setShowForm(true);
@@ -1132,6 +1133,7 @@ function DepartmentsSection({ projectId }: { projectId: string }) {
         slug: form.slug || undefined,
         notificationEmail: form.notificationEmail || undefined,
         linkedProjectId: form.type === 'PROJECT_BACKED' ? form.linkedProjectId || undefined : undefined,
+        sendNotification: form.sendNotification,
       };
       if (editId) return api.patch(`/projects/${projectId}/departments/${editId}`, payload);
       return api.post(`/projects/${projectId}/departments`, payload);
@@ -1212,6 +1214,13 @@ function DepartmentsSection({ projectId }: { projectId: string }) {
               <input type="number" value={form.sortOrder} onChange={e => setForm(f => ({ ...f, sortOrder: e.target.value }))} style={{ ...inputStyle, width: 80 }} min="0" />
             </div>
           </div>
+          <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)' }}>
+              <input type="checkbox" checked={form.sendNotification} onChange={e => setForm(f => ({ ...f, sendNotification: e.target.checked }))} style={{ accentColor: '#6366f1', width: 14, height: 14 }} />
+              Bildirim maili gönder
+            </label>
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Ticket yönlendirildiğinde departman mailini bilgilendir</span>
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => saveMutation.mutate()} disabled={!form.name || saveMutation.isPending} style={btnPrimary}>
               {saveMutation.isPending ? 'Kaydediliyor…' : 'Kaydet'}
@@ -1235,7 +1244,7 @@ function DepartmentsSection({ projectId }: { projectId: string }) {
                       {TYPE_LABELS[d.type] ?? d.type}
                     </span>
                   </div>
-                  {d.notificationEmail && <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>📧 {d.notificationEmail}</p>}
+                  {d.notificationEmail && <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>📧 {d.notificationEmail} {d.sendNotification ? <span style={{ color: '#10b981', fontSize: 10 }}>✓ Bildirim aktif</span> : <span style={{ color: 'var(--text-secondary)', fontSize: 10 }}>Bildirim kapalı</span>}</p>}
                   {d.linkedProject && <p style={{ fontSize: 11, color: '#10b981' }}>🔗 {d.linkedProject.name}</p>}
                 </div>
                 <button onClick={() => startEdit(d)} style={{ ...btnGhost, padding: '4px 10px', fontSize: 11 }}>Düzenle</button>
