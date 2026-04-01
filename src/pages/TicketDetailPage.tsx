@@ -2100,10 +2100,18 @@ function AttachmentsWidget({ ticketId }: { ticketId: string }) {
                 <p style={{ fontSize: 11, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.filename}</p>
                 <p style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{fmtBytes(att.sizeBytes ?? att.size_bytes ?? 0)}</p>
               </div>
-              <a href={`/api/v1/tickets/${ticketId}/attachments/${att.id}/download`} download={att.filename}
-                style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>
+              <button
+                onClick={async () => {
+                  const res = await api.get(`/tickets/${ticketId}/attachments/${att.id}/download`, { responseType: 'blob' });
+                  const url = URL.createObjectURL(res.data);
+                  const a = document.createElement('a');
+                  a.href = url; a.download = att.filename; a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}
+              >
                 <Download size={13} />
-              </a>
+              </button>
               <button
                 onClick={() => deleteMutation.mutate(att.id)}
                 disabled={deleteMutation.isPending}
