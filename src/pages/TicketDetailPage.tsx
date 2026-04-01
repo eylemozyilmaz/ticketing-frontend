@@ -248,6 +248,7 @@ function ForwardModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void
   const [toDeptId, setToDeptId] = useState('');
   const [toUserId, setToUserId] = useState('');
   const [note, setNote] = useState('');
+  const [sendNotification, setSendNotification] = useState(false);
   const [error, setError] = useState('');
 
   // Projedeki departmanları çek
@@ -274,6 +275,7 @@ function ForwardModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void
         toDeptId: toDeptId || undefined,
         toUserId: toUserId || undefined,
         note: note || undefined,
+        sendNotification,
       });
     },
     onSuccess: () => {
@@ -290,10 +292,10 @@ function ForwardModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void
       {/* Departman seçimi */}
       <label style={labelStyle}>Hedef Departman</label>
       {departments.length > 0 ? (
-        <select value={toDeptId} onChange={e => setToDeptId(e.target.value)} style={inputStyle}>
+        <select value={toDeptId} onChange={e => { setToDeptId(e.target.value); const dept = departments.find((d: any) => d.id === e.target.value); setSendNotification(dept?.sendNotification ?? false); }} style={inputStyle}>
           <option value="">— Seçin —</option>
           {departments.map((d: any) => (
-            <option key={d.id} value={d.id}>{d.name}</option>
+            <option key={d.id} value={d.id}>{d.name}{d.sendNotification ? ' 🔔' : ''}</option>
           ))}
         </select>
       ) : (
@@ -316,6 +318,16 @@ function ForwardModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void
         ))}
       </select>
 
+      {/* Bildirim toggle */}
+      {toDeptId && (
+        <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, background: sendNotification ? '#6366f110' : 'var(--bg-secondary)', border: `1px solid ${sendNotification ? '#6366f130' : 'var(--border)'}` }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--text-primary)', flex: 1 }}>
+            <input type="checkbox" checked={sendNotification} onChange={e => setSendNotification(e.target.checked)} style={{ accentColor: '#6366f1', width: 14, height: 14 }} />
+            Departmana bildirim maili gönder
+          </label>
+          <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>🔔</span>
+        </div>
+      )}
       {/* Not */}
       <label style={{ ...labelStyle, marginTop: 12 }}>Not (opsiyonel)</label>
       <textarea
