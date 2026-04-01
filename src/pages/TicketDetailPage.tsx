@@ -1477,6 +1477,65 @@ function CustomFieldsPanel({ ticket }: { ticket: Ticket }) {
 // ORTA PANEL: MESAJ ÖGESİ
 // ─────────────────────────────────────────────
 
+// ─────────────────────────────────────────────
+// MESAJ İÇERİĞİ — QUOTE GİZLEME
+// ─────────────────────────────────────────────
+
+function MessageContent({ bodyHtml, bodyText }: { bodyHtml?: string; bodyText?: string }) {
+  const [showQuote, setShowQuote] = useState(false);
+
+  if (bodyHtml) {
+    // Quote kısımlarını ayır
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(DOMPurify.sanitize(bodyHtml), 'text/html');
+    
+    // Gmail quote, blockquote, reply-separator gibi elementleri bul
+    const quoteSelectors = [
+      '.gmail_quote',
+      '.yahoo_quoted', 
+      'blockquote',
+      '.moz-cite-prefix',
+      '#divRplyFwdMsg',
+      '.WordSection1 > div > div',
+    ];
+    
+    let hasQuote = false;
+    quoteSelectors.forEach(sel => {
+      doc.querySelectorAll(sel).forEach(el => {
+        hasQuote = true;
+        if (!showQuote) el.remove();
+      });
+    });
+
+    const cleanHtml = doc.body.innerHTML;
+
+    return (
+      <div>
+        <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6 }}
+          dangerouslySetInnerHTML={{ __html: cleanHtml }} />
+        {hasQuote && (
+          <button
+            onClick={() => setShowQuote(p => !p)}
+            style={{ marginTop: 8, fontSize: 11, color: 'var(--text-secondary)', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 8px', cursor: 'pointer' }}
+          >
+            {showQuote ? 'Onceki mesajlari gizle' : '... Onceki mesajlari goster'}
+          </button>
+        )}
+        {hasQuote && showQuote && (
+          <div style={{ marginTop: 8, paddingLeft: 12, borderLeft: '2px solid var(--border)', opacity: 0.7 }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(bodyHtml) }} />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <pre style={{ fontSize: 13, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: 1.6, margin: 0 }}>
+      {bodyText}
+    </pre>
+  );
+}
+
 type MessageAction = 'reply' | 'replyAll' | 'forward' | 'copyContent' | 'addFile';
 
 function getMessageType(msg: TicketMessage): 'CUSTOMER' | 'INTERNAL' | 'EXTERNAL_PARTNER' {
@@ -1495,8 +1554,8 @@ const ACTION_LABELS: Record<MessageAction, string> = {
   reply: 'Cevapla', replyAll: 'Tümünü Cevapla', forward: 'Yönlendir', copyContent: 'Icerigi Kopyala', addFile: 'Dosya Ekle',
 };
 
-function MessageItem({ msg, onAction }: { msg: TicketMessage; onAction?: (action: MessageAction, msg: TicketMessage) => void }) {
-  const [expanded, setExpanded] = useState(true);
+function MessageItem({ msg, onAction, isLast = false }: { msg: TicketMessage; onAction?: (action: MessageAction, msg: TicketMessage) => void; isLast?: boolean }) {
+  const [expanded, setExpanded] = useState(isLast);
   const [actionsOpen, setActionsOpen] = useState(false);
   const msgType = getMessageType(msg);
   const config = MSG_TYPE_CONFIG[msgType];
@@ -1504,7 +1563,7 @@ function MessageItem({ msg, onAction }: { msg: TicketMessage; onAction?: (action
   const authorName = msg.author ? `${msg.author.firstName} ${msg.author.lastName}` : msg.direction === 'OUTBOUND' ? 'Agent' : config.label;
 
   return (
-    <div style={{ border: `1px solid ${config.border}`, borderRadius: 12, overflow: 'hidden', background: config.bg }}>
+    <div style={{ border: `1px solid ${config.border}`, borderRadius: 12, background: config.bg }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px' }}>
         <button onClick={() => setExpanded(p => !p)} style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', minWidth: 0 }}>
           <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', background: config.color }}>
@@ -1543,11 +1602,7 @@ function MessageItem({ msg, onAction }: { msg: TicketMessage; onAction?: (action
       </div>
       {expanded && (
         <div style={{ padding: '4px 14px 14px', borderTop: `1px solid ${config.border}` }}>
-          {msg.bodyHtml ? (
-            <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.bodyHtml) }} />
-          ) : (
-            <pre style={{ fontSize: 13, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: 1.6, margin: 0 }}>{msg.bodyText}</pre>
-          )}
+          <MessageContent bodyHtml={msg.bodyHtml} bodyText={msg.bodyText} />
         </div>
       )}
     </div>
@@ -1852,7 +1907,7 @@ function ThreadPanel({ ticket, messages }: { ticket: Ticket; messages: TicketMes
         {messages.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)', fontSize: 13 }}>Henüz mesaj yok</div>
         ) : (
-          messages.map((msg: any) => <MessageItem key={msg.id} msg={msg} onAction={handleAction} />)
+          messages.map((msg: any, idx: number) => <MessageItem key={msg.id} msg={msg} onAction={handleAction} isLast={idx === messages.length - 1} />)
         )}
         <div ref={bottomRef} />
       </div>
