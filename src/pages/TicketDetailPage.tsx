@@ -999,6 +999,95 @@ const MODAL_TITLES: Record<string, string> = {
   rootcause: 'Kök Neden Kaydet',
 };
 
+// ─────────────────────────────────────────────
+// MODAL: DIŞ PARTNER FORWARD
+// ─────────────────────────────────────────────
+
+function ExternalForwardModal({ ticket, originalMsg, onClose }: {
+  ticket: Ticket;
+  originalMsg: TicketMessage;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [to, setTo] = useState('');
+  const [cc, setCc] = useState('');
+  const [subject, setSubject] = useState(`Fw: ${ticket.subject} [#${ticket.ticketNo}]`);
+  const [body, setBody] = useState('');
+  const [error, setError] = useState('');
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      if (!to.trim()) throw new Error('Alici adresi zorunludur');
+      if (!body.trim()) throw new Error('Mesaj icerigi zorunludur');
+      return ticketsApi.externalForward(ticket.id, {
+        toAddresses: to.trim(),
+        ccAddresses: cc.trim() || undefined,
+        subject,
+        bodyText: body,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ticket-messages', ticket.id] });
+      onClose();
+    },
+    onError: (err: any) => {
+      setError(err?.response?.data?.message?.[0] ?? err?.message ?? 'Bir hata olustu');
+    },
+  });
+
+  return (
+    <ModalShell title="Dis Partnere Yonlendir" onClose={onClose}>
+      <div style={{ padding: '10px 14px', borderRadius: 8, background: '#10b98110', border: '1px solid #10b98130', fontSize: 12, color: '#10b981', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+        Bu mesaj dis bir partnere iletilecek. Sadece secili mesaj gonderilir.
+      </div>
+
+      <label style={labelStyle}>Alici (To) *</label>
+      <input value={to} onChange={e => setTo(e.target.value)} placeholder="partner@sirket.com" style={inputStyle} />
+
+      <label style={{ ...labelStyle, marginTop: 12 }}>CC (opsiyonel)</label>
+      <input value={cc} onChange={e => setCc(e.target.value)} placeholder="diger@sirket.com" style={inputStyle} />
+
+      <label style={{ ...labelStyle, marginTop: 12 }}>Konu *</label>
+      <input value={subject} onChange={e => setSubject(e.target.value)} style={inputStyle} />
+
+      <label style={{ ...labelStyle, marginTop: 12 }}>Mesaj *</label>
+      <textarea
+        value={body}
+        onChange={e => setBody(e.target.value)}
+        rows={5}
+        placeholder="Mesajinizi yazin..."
+        style={{ ...inputStyle, resize: 'none' }}
+      />
+
+      <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', fontSize: 11, color: 'var(--text-secondary)' }}>
+        <p style={{ fontWeight: 600, marginBottom: 4 }}>Orijinal Mesaj:</p>
+        <p style={{ whiteSpace: 'pre-wrap', maxHeight: 80, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {originalMsg.bodyText?.slice(0, 200)}{(originalMsg.bodyText?.length ?? 0) > 200 ? '...' : ''}
+        </p>
+      </div>
+
+      {error && (
+        <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: '#ef444415', border: '1px solid #ef444430', fontSize: 12, color: '#ef4444' }}>
+          {error}
+        </div>
+      )}
+
+      <button
+        onClick={() => { setError(''); mutation.mutate(); }}
+        disabled={!to.trim() || !body.trim() || mutation.isPending}
+        style={{ ...primaryBtnStyle, background: '#10b981', marginTop: 16 }}
+      >
+        {mutation.isPending
+          ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Spinner size={14} /> Gonderiliyor...</span>
+          : 'Dis Partnere Gonder'
+        }
+      </button>
+    </ModalShell>
+  );
+}
+
+
 function PlaceholderModal({ type, onClose }: { type: string; onClose: () => void }) {
   return (
     <ModalShell title={MODAL_TITLES[type] ?? type} onClose={onClose}>
@@ -1388,46 +1477,76 @@ function CustomFieldsPanel({ ticket }: { ticket: Ticket }) {
 // ORTA PANEL: MESAJ ÖGESİ
 // ─────────────────────────────────────────────
 
-function MessageItem({ msg }: { msg: TicketMessage }) {
-  const [expanded, setExpanded] = useState(true);
-  const isInternal = msg.isInternal || msg.is_internal;
-  const isOutbound = msg.direction === 'OUTBOUND' || msg.direction === 'outbound';
-  const authorName = msg.author
-    ? `${msg.author.firstName} ${msg.author.lastName}`
-    : isOutbound ? 'Agent' : 'Müşteri';
-  const sentAt = msg.sentAt || msg.createdAt || msg.sent_at;
+type MessageAction = 'reply' | 'replyAll' | 'forward' | 'copyContent' | 'addFile';
 
-  const borderColor = isInternal ? '#f59e0b' : isOutbound ? '#6366f1' : 'var(--border)';
-  const bg = isInternal ? '#f59e0b08' : isOutbound ? '#6366f108' : 'var(--bg-card)';
+function getMessageType(msg: TicketMessage): 'CUSTOMER' | 'INTERNAL' | 'EXTERNAL_PARTNER' {
+  if (msg.isInternal) return 'INTERNAL';
+  if (msg.messageType === 'EXTERNAL_PARTNER') return 'EXTERNAL_PARTNER';
+  return 'CUSTOMER';
+}
+
+const MSG_TYPE_CONFIG = {
+  CUSTOMER: { label: 'Musteri', color: '#6366f1', bg: '#6366f108', border: '#6366f130', actions: ['reply', 'replyAll', 'forward', 'copyContent', 'addFile'] as MessageAction[] },
+  INTERNAL: { label: 'Ic Not', color: '#f59e0b', bg: '#f59e0b08', border: '#f59e0b30', actions: ['reply', 'addFile'] as MessageAction[] },
+  EXTERNAL_PARTNER: { label: 'Dis Partner', color: '#10b981', bg: '#10b98108', border: '#10b98130', actions: ['reply', 'replyAll', 'forward', 'copyContent', 'addFile'] as MessageAction[] },
+};
+
+const ACTION_LABELS: Record<MessageAction, string> = {
+  reply: 'Cevapla', replyAll: 'Tümünü Cevapla', forward: 'Yönlendir', copyContent: 'Icerigi Kopyala', addFile: 'Dosya Ekle',
+};
+
+function MessageItem({ msg, onAction }: { msg: TicketMessage; onAction?: (action: MessageAction, msg: TicketMessage) => void }) {
+  const [expanded, setExpanded] = useState(true);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const msgType = getMessageType(msg);
+  const config = MSG_TYPE_CONFIG[msgType];
+  const sentAt = msg.sentAt || msg.createdAt;
+  const authorName = msg.author ? `${msg.author.firstName} ${msg.author.lastName}` : msg.direction === 'OUTBOUND' ? 'Agent' : config.label;
 
   return (
-    <div style={{ border: `1px solid ${borderColor}`, borderRadius: 12, overflow: 'hidden', background: bg }}>
-      <button onClick={() => setExpanded(p => !p)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
-        <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', background: isInternal ? '#f59e0b' : isOutbound ? '#6366f1' : '#6b7280' }}>
-          {authorName.charAt(0).toUpperCase()}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{authorName}</span>
-            {isInternal && <span style={{ fontSize: 10, color: '#f59e0b', background: '#f59e0b15', border: '1px solid #f59e0b30', padding: '1px 6px', borderRadius: 999, display: 'inline-flex', alignItems: 'center', gap: 3 }}><Lock size={9} /> İç Not</span>}
-            {msg.status === 'sending' && <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>gönderiliyor…</span>}
+    <div style={{ border: `1px solid ${config.border}`, borderRadius: 12, overflow: 'hidden', background: config.bg }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px' }}>
+        <button onClick={() => setExpanded(p => !p)} style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', minWidth: 0 }}>
+          <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff', background: config.color }}>
+            {authorName.charAt(0).toUpperCase()}
           </div>
-          {sentAt && <p style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 1 }}>{fmtDateTime(sentAt)}</p>}
-        </div>
-        <span style={{ flexShrink: 0, color: 'var(--text-secondary)' }}>
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </span>
-      </button>
-
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{authorName}</span>
+              <span style={{ fontSize: 10, color: config.color, background: `${config.color}15`, border: `1px solid ${config.border}`, padding: '1px 6px', borderRadius: 999 }}>{config.label}</span>
+              {msg.status === 'sending' && <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>gonderiliyor...</span>}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
+              {sentAt && <p style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{fmtDateTime(sentAt)}</p>}
+              {msg.toAddresses && <p style={{ fontSize: 10, color: 'var(--text-secondary)' }}>To: {msg.toAddresses}</p>}
+              {msg.ccAddresses && <p style={{ fontSize: 10, color: 'var(--text-secondary)' }}>CC: {msg.ccAddresses}</p>}
+            </div>
+          </div>
+          <span style={{ flexShrink: 0, color: 'var(--text-secondary)' }}>{expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</span>
+        </button>
+        {onAction && (
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <button onClick={() => setActionsOpen(p => !p)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-secondary)', cursor: 'pointer', fontSize: 11, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              Islem <ChevronDown size={11} />
+            </button>
+            {actionsOpen && (
+              <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 50, minWidth: 160 }}>
+                {config.actions.map(action => (
+                  <button key={action} onClick={() => { setActionsOpen(false); onAction(action, msg); }} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-primary)' }} onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-secondary)'} onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                    {ACTION_LABELS[action]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       {expanded && (
-        <div style={{ padding: '4px 14px 14px' }}>
+        <div style={{ padding: '4px 14px 14px', borderTop: `1px solid ${config.border}` }}>
           {msg.bodyHtml ? (
-            <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6 }}
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.bodyHtml) }} />
+            <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.6 }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.bodyHtml) }} />
           ) : (
-            <pre style={{ fontSize: 13, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: 1.6, margin: 0 }}>
-              {msg.bodyText || msg.body_text}
-            </pre>
+            <pre style={{ fontSize: 13, color: 'var(--text-primary)', whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: 1.6, margin: 0 }}>{msg.bodyText}</pre>
           )}
         </div>
       )}
@@ -1439,18 +1558,27 @@ function MessageItem({ msg }: { msg: TicketMessage }) {
 // ORTA PANEL: YANIT EDİTÖRÜ
 // ─────────────────────────────────────────────
 
-function ReplyEditor({ ticket, initialCc = '' }: { ticket: Ticket; initialCc?: string }) {
+function ReplyEditor({ ticket, initialCc = '', replyToMsg, onSent }: {
+  ticket: Ticket;
+  initialCc?: string;
+  replyToMsg?: TicketMessage;
+  onSent?: () => void;
+}) {
   const [mode, setMode] = useState<'reply' | 'internal'>('reply');
   const [draft, setDraft] = useState('');
   const [cc, setCc] = useState(initialCc);
   const qc = useQueryClient();
   const isChild = ticket.isChild || ticket.is_child;
 
+  // replyToMsg degisince cc guncelle
+  useEffect(() => { setCc(initialCc); }, [initialCc]);
+
   const sendMutation = useMutation({
     mutationFn: () => ticketsApi.addMessage(ticket.id, {
       bodyText: draft,
       isInternal: mode === 'internal',
       ccAddresses: (mode === 'reply' && cc.trim()) ? cc.trim() : undefined,
+      inReplyToHeader: replyToMsg?.messageIdHeader || undefined,
     }),
     onMutate: async () => {
       const optimistic = { id: `opt-${Date.now()}`, direction: 'OUTBOUND', bodyText: draft, isInternal: mode === 'internal', createdAt: new Date().toISOString(), status: 'sending' };
@@ -1460,7 +1588,12 @@ function ReplyEditor({ ticket, initialCc = '' }: { ticket: Ticket; initialCc?: s
       });
       return { optimistic };
     },
-    onSuccess: () => { setDraft(''); qc.invalidateQueries({ queryKey: ['ticket-messages', ticket.id] }); },
+    onSuccess: () => {
+      setDraft('');
+      setCc('');
+      qc.invalidateQueries({ queryKey: ['ticket-messages', ticket.id] });
+      onSent?.();
+    },
     onError: (_err: any, _vars: any, ctx: any) => {
       qc.setQueryData(['ticket-messages', ticket.id], (old: any) => {
         const msgs = old?.data?.data ?? [];
@@ -1472,37 +1605,39 @@ function ReplyEditor({ ticket, initialCc = '' }: { ticket: Ticket; initialCc?: s
   if (ticket.closedAt) return null;
 
   return (
-    <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--bg-card)' }}>
+    <div style={{ border: `1px solid ${replyToMsg ? '#6366f1' : 'var(--border)'}`, borderRadius: 12, overflow: 'hidden', background: 'var(--bg-card)' }}>
+      {replyToMsg && (
+        <div style={{ padding: '6px 14px', background: '#6366f108', borderBottom: '1px solid #6366f130', fontSize: 11, color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>Yanit: {replyToMsg.author ? `${replyToMsg.author.firstName} ${replyToMsg.author.lastName}` : 'Musteri'}</span>
+          <button onClick={() => onSent?.()} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6366f1' }}><X size={12} /></button>
+        </div>
+      )}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
         <button onClick={() => setMode('reply')} disabled={isChild} style={{ padding: '10px 16px', fontSize: 12, fontWeight: 500, border: 'none', borderBottom: `2px solid ${mode === 'reply' ? '#6366f1' : 'transparent'}`, color: mode === 'reply' ? '#6366f1' : 'var(--text-secondary)', background: 'none', cursor: isChild ? 'not-allowed' : 'pointer', opacity: isChild ? 0.4 : 1, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <Reply size={13} /> Müşteriye Yanıt
+          <Reply size={13} /> Musteriye Yanit
         </button>
         <button onClick={() => setMode('internal')} style={{ padding: '10px 16px', fontSize: 12, fontWeight: 500, border: 'none', borderBottom: `2px solid ${mode === 'internal' ? '#f59e0b' : 'transparent'}`, color: mode === 'internal' ? '#f59e0b' : 'var(--text-secondary)', background: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <Lock size={13} /> İç Not
+          <Lock size={13} /> Ic Not
         </button>
       </div>
 
       {isChild && mode === 'reply' && (
         <div style={{ padding: '8px 14px', background: '#f59e0b10', borderBottom: '1px solid #f59e0b30', fontSize: 11, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <AlertTriangle size={12} /> Child ticket'larda müşteriye doğrudan yanıt gönderilemez. İç not kullanın.
+          <AlertTriangle size={12} /> Child ticketlarda musteriye dogrudan yanit gonderilemez. Ic not kullanin.
         </div>
       )}
 
       {mode === 'reply' && !isChild && (
         <div style={{ padding: '6px 14px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 11, color: 'var(--text-secondary)', flexShrink: 0 }}>CC:</span>
-          <input
-            value={cc}
-            onChange={e => setCc(e.target.value)}
-            placeholder="ornek@email.com, diger@email.com"
-            style={{ flex: 1, border: 'none', outline: 'none', fontSize: 12, color: 'var(--text-primary)', background: 'transparent' }}
-          />
+          <input value={cc} onChange={e => setCc(e.target.value)} placeholder="ornek@email.com, diger@email.com"
+            style={{ flex: 1, border: 'none', outline: 'none', fontSize: 12, color: 'var(--text-primary)', background: 'transparent' }} />
         </div>
       )}
 
       <textarea value={draft} onChange={e => setDraft(e.target.value)}
         disabled={(isChild && mode === 'reply') || sendMutation.isPending}
-        placeholder={isChild && mode === 'reply' ? '(Yanıt devre dışı)' : mode === 'internal' ? 'İç not — müşteri görmez…' : 'Müşteriye yanıt yaz…'}
+        placeholder={isChild && mode === 'reply' ? '(Yanit devre disi)' : mode === 'internal' ? 'Ic not - musteri gormez...' : 'Musteriye yanit yaz...'}
         rows={4}
         style={{ width: '100%', padding: '12px 14px', resize: 'none', border: 'none', fontSize: 13, color: 'var(--text-primary)', background: 'transparent', outline: 'none', lineHeight: 1.6, boxSizing: 'border-box' }}
       />
@@ -1512,7 +1647,7 @@ function ReplyEditor({ ticket, initialCc = '' }: { ticket: Ticket; initialCc?: s
         <button onClick={() => sendMutation.mutate()}
           disabled={!draft.trim() || sendMutation.isPending || (isChild && mode === 'reply')}
           style={{ padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#fff', background: mode === 'internal' ? '#f59e0b' : '#6366f1', opacity: (!draft.trim() || (isChild && mode === 'reply')) ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
-          {sendMutation.isPending ? <><Spinner size={12} /> Gönderiliyor</> : mode === 'internal' ? <><Plus size={13} /> Not Ekle</> : <><Send size={13} /> Gönder</>}
+          {sendMutation.isPending ? <><Spinner size={12} /> Gonderiliyor</> : mode === 'internal' ? <><Plus size={13} /> Not Ekle</> : <><Send size={13} /> Gonder</>}
         </button>
       </div>
     </div>
@@ -1695,32 +1830,42 @@ function CategoryPanel({ ticketId, projectId }: { ticketId: string; projectId: s
 
 function ThreadPanel({ ticket, messages }: { ticket: Ticket; messages: TicketMessage[] }) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [replyContext, setReplyContext] = useState<{ mode: 'reply' | 'replyAll'; msg: TicketMessage } | null>(null);
+  const [externalForwardMsg, setExternalForwardMsg] = useState<TicketMessage | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
+  const handleAction = (action: MessageAction, msg: TicketMessage) => {
+    if (action === 'copyContent') { navigator.clipboard.writeText(msg.bodyText || ''); return; }
+    if (action === 'forward') { setExternalForwardMsg(msg); return; }
+    if (action === 'reply' || action === 'replyAll') { setReplyContext({ mode: action, msg }); return; }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      {externalForwardMsg && (
+        <ExternalForwardModal ticket={ticket} originalMsg={externalForwardMsg} onClose={() => setExternalForwardMsg(null)} />
+      )}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {messages.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)', fontSize: 13 }}>Henüz mesaj yok</div>
         ) : (
-          messages.map((msg: any) => <MessageItem key={msg.id} msg={msg} />)
+          messages.map((msg: any) => <MessageItem key={msg.id} msg={msg} onAction={handleAction} />)
         )}
         <div ref={bottomRef} />
       </div>
-
       <div style={{ padding: '10px 20px', borderTop: '1px solid var(--border)' }}>
         <CategoryPanel ticketId={ticket.id} projectId={ticket.projectId} />
       </div>
-
       <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)' }}>
-        <ReplyEditor ticket={ticket} initialCc={
-          [...messages].reverse().find(m => m.direction === 'INBOUND' && (m as any).ccAddresses)
-            ? (messages).slice().reverse().find(m => m.direction === 'INBOUND' && (m as any).ccAddresses)?.['ccAddresses'] ?? ''
-            : ''
-        } />
+        <ReplyEditor
+          ticket={ticket}
+          initialCc={replyContext?.mode === 'replyAll' ? (replyContext.msg.ccAddresses || '') : ''}
+          replyToMsg={replyContext?.msg}
+          onSent={() => setReplyContext(null)}
+        />
       </div>
     </div>
   );

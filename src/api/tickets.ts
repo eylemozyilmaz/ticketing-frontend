@@ -44,4 +44,6 @@ export const ticketsApi = {
   upsertCustomValue: (id: string, data: Record<string, any>) =>
     api.post(`/tickets/${id}/custom-values`, data),
   markViewed: (id: string) => api.post(`/tickets/${id}/viewed`),
+  externalForward: (id: string, data: Record<string, any>) =>
+    api.post(`/tickets/${id}/external-forward`, data),
 };

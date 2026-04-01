@@ -66,11 +66,15 @@ export interface TicketMessage {
   author?: Agent;
   direction: 'INBOUND' | 'OUTBOUND';
   isInternal: boolean;
+  messageType?: 'EMAIL' | 'INTERNAL_NOTE' | 'EXTERNAL_PARTNER';
   bodyText?: string;
   bodyHtml?: string;
   sentAt: string;
   createdAt?: string;
   status?: string;
+  ccAddresses?: string;
+  toAddresses?: string;
+  messageIdHeader?: string;
 }
 
 export interface TicketAttachment {
