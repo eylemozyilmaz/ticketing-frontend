@@ -1025,18 +1025,21 @@ function ExternalForwardModal({ ticket, originalMsg, onClose }: {
   const [cc, setCc] = useState('');
   const [subject, setSubject] = useState(`Fw: ${ticket.subject} [#${ticket.ticketNo}]`);
   const [body, setBody] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const mutation = useMutation({
     mutationFn: () => {
       if (!to.trim()) throw new Error('Alici adresi zorunludur');
       if (!body.trim()) throw new Error('Mesaj icerigi zorunludur');
-      return ticketsApi.externalForward(ticket.id, {
-        toAddresses: to.trim(),
-        ccAddresses: cc.trim() || undefined,
-        subject,
-        bodyText: body,
-      });
+      const fd = new FormData();
+      fd.append('toAddresses', to.trim());
+      if (cc.trim()) fd.append('ccAddresses', cc.trim());
+      fd.append('subject', subject);
+      fd.append('bodyText', body);
+      files.forEach(f => fd.append('files', f));
+      return ticketsApi.externalForward(ticket.id, fd as any);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['ticket-messages', ticket.id] });
@@ -1053,24 +1056,39 @@ function ExternalForwardModal({ ticket, originalMsg, onClose }: {
         <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
         Bu mesaj dis bir partnere iletilecek. Sadece secili mesaj gonderilir.
       </div>
-
       <label style={labelStyle}>Alici (To) *</label>
       <input value={to} onChange={e => setTo(e.target.value)} placeholder="partner@sirket.com" style={inputStyle} />
-
       <label style={{ ...labelStyle, marginTop: 12 }}>CC (opsiyonel)</label>
       <input value={cc} onChange={e => setCc(e.target.value)} placeholder="diger@sirket.com" style={inputStyle} />
-
       <label style={{ ...labelStyle, marginTop: 12 }}>Konu *</label>
       <input value={subject} onChange={e => setSubject(e.target.value)} style={inputStyle} />
-
       <label style={{ ...labelStyle, marginTop: 12 }}>Mesaj *</label>
-      <textarea
-        value={body}
-        onChange={e => setBody(e.target.value)}
-        rows={5}
-        placeholder="Mesajinizi yazin..."
-        style={{ ...inputStyle, resize: 'none' }}
-      />
+      <textarea value={body} onChange={e => setBody(e.target.value)} rows={5} placeholder="Mesajinizi yazin..." style={{ ...inputStyle, resize: 'none' }} />
+
+      {/* Dosya ekleme */}
+      <div style={{ marginTop: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <button onClick={() => fileInputRef.current?.click()}
+            style={{ fontSize: 11, color: '#10b981', background: 'none', border: '1px solid #10b98130', borderRadius: 6, cursor: 'pointer', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <Paperclip size={11} /> Dosya Ekle
+          </button>
+          <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }}
+            onChange={e => { setFiles(prev => [...prev, ...Array.from(e.target.files || [])]); e.target.value = ''; }} />
+        </div>
+        {files.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {files.map((f, i) => (
+              <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                <Paperclip size={10} />{f.name}
+                <button onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', padding: 0 }}>
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border)', fontSize: 11, color: 'var(--text-secondary)' }}>
         <p style={{ fontWeight: 600, marginBottom: 4 }}>Orijinal Mesaj:</p>
@@ -1084,22 +1102,16 @@ function ExternalForwardModal({ ticket, originalMsg, onClose }: {
           {error}
         </div>
       )}
-
-      <button
-        onClick={() => { setError(''); mutation.mutate(); }}
+      <button onClick={() => { setError(''); mutation.mutate(); }}
         disabled={!to.trim() || !body.trim() || mutation.isPending}
-        style={{ ...primaryBtnStyle, background: '#10b981', marginTop: 16 }}
-      >
+        style={{ ...primaryBtnStyle, background: '#10b981', marginTop: 16 }}>
         {mutation.isPending
           ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Spinner size={14} /> Gonderiliyor...</span>
-          : 'Dis Partnere Gonder'
-        }
+          : 'Dis Partnere Gonder'}
       </button>
     </ModalShell>
   );
 }
-
-
 function PlaceholderModal({ type, onClose }: { type: string; onClose: () => void }) {
   return (
     <ModalShell title={MODAL_TITLES[type] ?? type} onClose={onClose}>
