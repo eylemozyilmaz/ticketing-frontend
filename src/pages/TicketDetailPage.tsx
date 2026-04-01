@@ -1899,6 +1899,9 @@ function ThreadPanel({ ticket, messages }: { ticket: Ticket; messages: TicketMes
   const bottomRef = useRef<HTMLDivElement>(null);
   const [replyContext, setReplyContext] = useState<{ mode: 'reply' | 'replyAll'; msg: TicketMessage } | null>(null);
   const [externalForwardMsg, setExternalForwardMsg] = useState<TicketMessage | null>(null);
+  const [fileTargetMsg, setFileTargetMsg] = useState<TicketMessage | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const qc = useQueryClient();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1908,6 +1911,21 @@ function ThreadPanel({ ticket, messages }: { ticket: Ticket; messages: TicketMes
     if (action === 'copyContent') { navigator.clipboard.writeText(msg.bodyText || ''); return; }
     if (action === 'forward') { setExternalForwardMsg(msg); return; }
     if (action === 'reply' || action === 'replyAll') { setReplyContext({ mode: action, msg }); return; }
+    if (action === 'addFile') { setFileTargetMsg(msg); fileInputRef.current?.click(); return; }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !fileTargetMsg) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('messageId', fileTargetMsg.id);
+    try {
+      await ticketsApi.addAttachment(ticket.id, fd);
+      qc.invalidateQueries({ queryKey: ['ticket-attachments', ticket.id] });
+    } catch {}
+    e.target.value = '';
+    setFileTargetMsg(null);
   };
 
   return (
@@ -1915,6 +1933,7 @@ function ThreadPanel({ ticket, messages }: { ticket: Ticket; messages: TicketMes
       {externalForwardMsg && (
         <ExternalForwardModal ticket={ticket} originalMsg={externalForwardMsg} onClose={() => setExternalForwardMsg(null)} />
       )}
+      <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleFileUpload} />
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {messages.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)', fontSize: 13 }}>Henüz mesaj yok</div>
