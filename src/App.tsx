@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import TicketsPage from './pages/TicketsPage';
 import TicketDetailPage from './pages/TicketDetailPage';
+import ApprovalsPage from './pages/ApprovalsPage';
 import SettingsPage from './pages/SettingsPage';
 import UsersPage from './pages/UsersPage';
 import ProjectSelectPage from './pages/ProjectSelectPage';
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="/tickets" element={<TicketsPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/tickets/:id" element={<TicketDetailPage />} />
+          <Route path="/approvals" element={<ApprovalsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Routes>

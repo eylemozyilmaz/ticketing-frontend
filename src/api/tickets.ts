@@ -19,7 +19,10 @@ export const ticketsApi = {
   recall: (id: string) => api.patch(`/tickets/${id}/recall`),
   close: (id: string, data: Record<string, any>) => api.post(`/tickets/${id}/close`, data),
   getMessages: (id: string) => api.get(`/tickets/${id}/messages`),
-  addMessage: (id: string, data: Record<string, any>) => api.post(`/tickets/${id}/messages`, data),
+  addMessage: (id: string, data: Record<string, any> | FormData) =>
+    api.post(`/tickets/${id}/messages`, data, {
+      headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {},
+    }),
   getRelated: (id: string) => api.get(`/tickets/${id}/related`),
   getSla: (id: string) => api.get(`/tickets/${id}/sla`),
   getAttachments: (id: string) => api.get(`/tickets/${id}/attachments`),

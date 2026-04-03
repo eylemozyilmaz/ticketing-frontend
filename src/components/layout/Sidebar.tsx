@@ -240,6 +240,16 @@ export default function Sidebar() {
           Kullanıcılar
         </NavLink>
 
+        {(isAdmin || projectRole === 'SUPERVISOR') && (
+          <NavLink to="/approvals"
+            className={({ isActive }) => "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition " + (isActive ? 'bg-indigo-600/20' : '')}
+            style={({ isActive }) => ({ color: isActive ? '#6366f1' : 'var(--text-secondary)' })}>
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Onaylar
+          </NavLink>
+        )}
         {isAdmin && (
           <NavLink to="/settings"
             className={({ isActive }) => "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition " + (isActive ? 'bg-indigo-600/20' : '')}

@@ -122,7 +122,7 @@ export default function UsersPage() {
   });
 
   // Proje ekleme formu
-  const [addProjectForm, setAddProjectForm] = useState({ projectId: '', role: 'AGENT', departmentId: '' });
+  const [addProjectForm, setAddProjectForm] = useState({ projectId: '', role: 'AGENT', departmentId: '', maxCompensationTl: '' });
   const [addProjectError, setAddProjectError] = useState('');
 
   // Tüm kullanıcılar
@@ -194,11 +194,12 @@ export default function UsersPage() {
         projectId: addProjectForm.projectId,
         role: addProjectForm.role,
         departmentId: addProjectForm.departmentId || undefined,
+        maxCompensationTl: addProjectForm.maxCompensationTl ? Number(addProjectForm.maxCompensationTl) : undefined,
       });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['user-memberships', selectedUser?.id] });
-      setAddProjectForm({ projectId: '', role: 'AGENT', departmentId: '' });
+      setAddProjectForm({ projectId: '', role: 'AGENT', departmentId: '', maxCompensationTl: '' });
       setSelectedProjectForDept('');
       setAddProjectError('');
     },
@@ -398,6 +399,12 @@ export default function UsersPage() {
                           <option value="">— Yok —</option>
                           {departments.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
                         </select>
+                      </div>
+                      <div>
+                        <label style={lbl}>Maks. Kompanzasyon (TL)</label>
+                        <input type="number" value={addProjectForm.maxCompensationTl}
+                          onChange={e => setAddProjectForm(f => ({ ...f, maxCompensationTl: e.target.value }))}
+                          style={inp} placeholder="Örn: 500" />
                       </div>
                     </div>
                     {addProjectError && <p style={{ fontSize: 11, color: '#ef4444', marginBottom: 6 }}>{addProjectError}</p>}

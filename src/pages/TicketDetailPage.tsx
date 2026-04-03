@@ -368,6 +368,7 @@ function CloseModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void }
   const [outcome, setOutcome] = useState('SATISFIED');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
+  const [approvalSent, setApprovalSent] = useState(false);
 
   const OUTCOMES = [
     { value: 'SATISFIED', label: 'Müşteri memnun' },
@@ -394,12 +395,29 @@ function CloseModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void }
 
   return (
     <ModalShell title="Ticket'ı Kapat" onClose={onClose}>
+      {/* Onay gönderildi */}
+      {approvalSent ? (
+        <div style={{ padding: 20, textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+          <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>Onay Talebi Gönderildi</p>
+          <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 16 }}>Bu ticket onay gerektiriyor. Supervisor onayladığında ticket kapanacak.</p>
+          <button onClick={onClose} style={primaryBtnStyle}>Tamam</button>
+        </div>
+      ) : (
+      <>
       {/* Uyarı */}
       <div style={{ padding: '10px 14px', borderRadius: 8, background: '#ef444410', border: '1px solid #ef444430', fontSize: 12, color: '#ef4444', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
         <AlertTriangle size={14} style={{ flexShrink: 0 }} />
         Bu işlem geri alınamaz. Ticket kapatılacak.
       </div>
 
+      {approvalSent ? (
+        <div style={{ padding: 20, textAlign: 'center' }}>
+          <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>✅ Onay Talebi Gönderildi</p>
+          <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 16 }}>Supervisor onayladığında ticket kapanacak.</p>
+          <button onClick={onClose} style={primaryBtnStyle}>Tamam</button>
+        </div>
+      ) : (<>
       {/* Kapanış sonucu */}
       <label style={labelStyle}>Kapanış Sonucu *</label>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
@@ -1655,13 +1673,21 @@ function ReplyEditor({ ticket, initialCc = '', replyToMsg, onSent }: {
 
   const sendMutation = useMutation({
     mutationFn: () => {
-      const fd = new FormData();
-      if (draft) fd.append('bodyText', draft);
-      fd.append('isInternal', mode === 'internal' ? 'true' : 'false');
-      if (mode === 'reply' && cc.trim()) fd.append('ccAddresses', cc.trim());
-      if (replyToMsg?.messageIdHeader) fd.append('inReplyToHeader', replyToMsg.messageIdHeader);
-      files.forEach(f => fd.append('files', f));
-      return ticketsApi.addMessage(ticket.id, fd as any);
+      if (files.length > 0) {
+        const fd = new FormData();
+        if (draft) fd.append('bodyText', draft);
+        fd.append('isInternal', mode === 'internal' ? 'true' : 'false');
+        if (mode === 'reply' && cc.trim()) fd.append('ccAddresses', cc.trim());
+        if (replyToMsg?.messageIdHeader) fd.append('inReplyToHeader', replyToMsg.messageIdHeader);
+        files.forEach(f => fd.append('files', f));
+        return ticketsApi.addMessage(ticket.id, fd as any);
+      }
+      return ticketsApi.addMessage(ticket.id, {
+        bodyText: draft,
+        isInternal: mode === 'internal',
+        ccAddresses: (mode === 'reply' && cc.trim()) ? cc.trim() : undefined,
+        inReplyToHeader: replyToMsg?.messageIdHeader || undefined,
+      });
     },
     onMutate: async () => {
       const optimistic = { id: `opt-${Date.now()}`, direction: 'OUTBOUND', bodyText: draft, isInternal: mode === 'internal', createdAt: new Date().toISOString(), status: 'sending' };
@@ -2434,7 +2460,7 @@ export default function TicketDetailPage() {
             <ActionPanel ticket={ticket} onModal={setActiveModal} />
             <AttachmentsWidget ticketId={id!} />
             <ResolutionsWidget ticketId={id!} />
-            <ApprovalsWidget ticketId={id!} />
+            <ApprovalsWidget ticketId={id!} canEdit={canEdit} />
           </div>
         )}
       </div>

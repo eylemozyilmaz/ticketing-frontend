@@ -587,6 +587,12 @@ function CategoriesSection({ projectId }: { projectId: string }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['project-categories', projectId] }),
   });
 
+  const toggleApprovalMutation = useMutation({
+    mutationFn: ({ id, requiresApproval }: { id: string; requiresApproval: boolean }) =>
+      api.patch(`/projects/${projectId}/categories/${id}`, { requiresApproval }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['project-categories', projectId] }),
+  });
+
   const levelLabels = ['Üst Kategori', 'Kategori', 'Alt Kategori'];
 
   const toggleBtn = (isOpen: boolean) => (
@@ -716,6 +722,11 @@ function CategoriesSection({ projectId }: { projectId: string }) {
                                       <div key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 6px', borderRadius: 6, marginBottom: 2 }}>
                                         <div style={{ width: 20, flexShrink: 0 }} />
                                         <span style={{ fontSize: 11, color: 'var(--text-secondary)', flex: 1 }}>📄 {sub.name}</span>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                                          <input type="checkbox" checked={!!sub.requiresApproval}
+                                            onChange={e => toggleApprovalMutation.mutate({ id: sub.id, requiresApproval: e.target.checked })} />
+                                          Onaya Tabi
+                                        </label>
                                         <button onClick={() => deleteMutation.mutate(sub.id)} style={{ ...btnDanger, padding: '3px 8px', fontSize: 11 }}>Sil</button>
                                       </div>
                                     ))
@@ -875,7 +886,7 @@ function ResolutionTypesSection({ projectId }: { projectId: string }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', description: '', requiresAmount: false, sortOrder: 0 });
+  const [form, setForm] = useState({ name: '', description: '', requiresAmount: false, requiresApproval: false, sortOrder: 0 });
 
   const { data: res } = useQuery({
     queryKey: ['resolution-types', projectId],
@@ -884,10 +895,10 @@ function ResolutionTypesSection({ projectId }: { projectId: string }) {
   });
   const types = extractData(res);
 
-  const resetForm = () => { setForm({ name: '', description: '', requiresAmount: false, sortOrder: 0 }); setEditId(null); };
+  const resetForm = () => { setForm({ name: '', description: '', requiresAmount: false, requiresApproval: false, sortOrder: 0 }); setEditId(null); };
 
   const startEdit = (t: any) => {
-    setForm({ name: t.name, description: t.description ?? '', requiresAmount: t.requiresAmount ?? false, sortOrder: t.sortOrder ?? 0 });
+    setForm({ name: t.name, description: t.description ?? '', requiresAmount: t.requiresAmount ?? false, requiresApproval: t.requiresApproval ?? false, sortOrder: t.sortOrder ?? 0 });
     setEditId(t.id);
     setShowForm(true);
   };
@@ -933,6 +944,10 @@ function ResolutionTypesSection({ projectId }: { projectId: string }) {
               <input type="checkbox" checked={form.requiresAmount} onChange={e => setForm(f => ({ ...f, requiresAmount: e.target.checked }))} />
               Tutar gerektirir
             </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.requiresApproval} onChange={e => setForm(f => ({ ...f, requiresApproval: e.target.checked }))} />
+              Onaya Tabi
+            </label>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => saveMutation.mutate()} disabled={!form.name || saveMutation.isPending} style={btnPrimary}>
@@ -953,7 +968,8 @@ function ResolutionTypesSection({ projectId }: { projectId: string }) {
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{t.name}</p>
                   {t.description && <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>{t.description}</p>}
-                  {t.requiresAmount && <span style={{ fontSize: 10, color: '#f59e0b', background: '#f59e0b15', padding: '1px 6px', borderRadius: 999, marginTop: 4, display: 'inline-block' }}>Tutar gerektirir</span>}
+                  {t.requiresAmount && <span style={{ fontSize: 10, color: '#f59e0b', background: '#f59e0b15', padding: '1px 6px', borderRadius: 999, marginTop: 4, display: 'inline-block', marginRight: 4 }}>Tutar gerektirir</span>}
+                  {t.requiresApproval && <span style={{ fontSize: 10, color: '#6366f1', background: '#6366f115', padding: '1px 6px', borderRadius: 999, marginTop: 4, display: 'inline-block' }}>Onaya Tabi</span>}
                 </div>
                 <button onClick={() => startEdit(t)} style={{ ...btnGhost, padding: '4px 10px', fontSize: 11 }}>Düzenle</button>
                 <button onClick={() => deleteMutation.mutate(t.id)} style={{ ...btnDanger, padding: '4px 10px', fontSize: 11 }}>Sil</button>
