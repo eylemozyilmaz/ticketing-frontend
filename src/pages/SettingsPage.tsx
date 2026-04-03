@@ -13,6 +13,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.store';
 import { useProjectStore } from '../store/project.store';
 import api from '../api/client';
+import { PERMISSIONS, PERMISSION_GROUPS } from '../constants/permissions';
 
 // ─────────────────────────────────────────────
 // YARDIMCI
@@ -1285,6 +1286,7 @@ const SECTIONS = [
   { key: 'resolution-types', label: 'Çözüm Türleri', icon: '✅' },
   { key: 'departments', label: 'Departmanlar', icon: '🏢' },
   { key: 'mail', label: 'Mail Ayarları', icon: '📧' },
+  { key: 'roles', label: 'Roller & Yetkiler', icon: '🔐' },
 ];
 
 export default function SettingsPage() {
@@ -1346,6 +1348,7 @@ export default function SettingsPage() {
         {activeSection === 'resolution-types' && <ResolutionTypesSection projectId={projectId} />}
         {activeSection === 'departments' && <DepartmentsSection projectId={projectId} />}
         {activeSection === 'mail' && <MailSettingsSection projectId={projectId} />}
+        {activeSection === 'roles' && <RolesSection />}
       </div>
     </div>
   );
