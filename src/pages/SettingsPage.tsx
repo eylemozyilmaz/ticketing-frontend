@@ -986,6 +986,130 @@ function ResolutionTypesSection({ projectId }: { projectId: string }) {
 // BÖLÜM: DEPARTMANLAR
 // ─────────────────────────────────────────────
 
+function RolesSection() {
+  const qc = useQueryClient();
+  const { user } = useAuthStore();
+  const [selectedRoleId, setSelectedRoleId] = useState(null);
+  const [showNewRole, setShowNewRole] = useState(false);
+  const [newRole, setNewRole] = useState({ name: '', label: '', scope: 'PROJECT' });
+  const [saving, setSaving] = useState(false);
+
+  const { data: res } = useQuery({
+    queryKey: ['roles'],
+    queryFn: () => api.get('/roles'),
+    staleTime: 0,
+  });
+  const roles = res?.data?.data ?? res?.data ?? [];
+  const selectedRole = roles.find((r) => r.id === selectedRoleId);
+  const selectedPerms = new Set((selectedRole?.permissions ?? []).map((p) => p.permissionKey));
+
+  const createMutation = useMutation({
+    mutationFn: () => api.post('/roles', newRole),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['roles'] }); setShowNewRole(false); setNewRole({ name: '', label: '', scope: 'PROJECT' }); },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => api.delete(`/roles/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['roles'] }); setSelectedRoleId(null); },
+  });
+
+  const togglePermission = async (permKey) => {
+    if (!selectedRoleId || (selectedRole?.isSystem && user?.role !== 'SUPER_ADMIN')) return;
+    const newPerms = new Set(selectedPerms);
+    if (newPerms.has(permKey)) newPerms.delete(permKey); else newPerms.add(permKey);
+    setSaving(true);
+    await api.patch(`/roles/${selectedRoleId}/permissions`, { permissions: Array.from(newPerms) });
+    qc.invalidateQueries({ queryKey: ['roles'] });
+    setSaving(false);
+  };
+
+  const projectPerms = Object.entries(PERMISSIONS).filter(([, v]) => v.scope === 'PROJECT');
+  const globalPerms = Object.entries(PERMISSIONS).filter(([, v]) => v.scope === 'GLOBAL');
+  const scopePerms = selectedRole?.scope === 'GLOBAL' ? [...globalPerms, ...projectPerms] : projectPerms;
+  const groups = [...new Set(scopePerms.map(([, v]) => v.group))];
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 16 }}>
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>Roller</h2>
+          <button onClick={() => setShowNewRole(p => !p)} style={{ ...btnPrimary, padding: '4px 10px', fontSize: 11 }}>+ Yeni</button>
+        </div>
+        {showNewRole && (
+          <div style={{ ...card, marginBottom: 10, padding: 10 }}>
+            <input value={newRole.label} onChange={e => setNewRole(f => ({ ...f, label: e.target.value, name: e.target.value.toUpperCase().replace(/ /g, '_') }))}
+              placeholder="Rol adı" style={{ ...inputStyle, marginBottom: 6 }} />
+            <select value={newRole.scope} onChange={e => setNewRole(f => ({ ...f, scope: e.target.value }))} style={{ ...inputStyle, marginBottom: 6 }}>
+              <option value="PROJECT">Proje Rolü</option>
+              <option value="GLOBAL">Global Rol</option>
+            </select>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => createMutation.mutate()} disabled={!newRole.label || createMutation.isPending} style={{ ...btnPrimary, fontSize: 11, padding: '4px 10px' }}>Ekle</button>
+              <button onClick={() => setShowNewRole(false)} style={{ ...btnGhost, fontSize: 11, padding: '4px 10px' }}>İptal</button>
+            </div>
+          </div>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {roles.map((role) => (
+            <div key={role.id} onClick={() => setSelectedRoleId(role.id)} style={{
+              padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
+              border: `1px solid ${selectedRoleId === role.id ? '#6366f1' : 'var(--border)'}`,
+              background: selectedRoleId === role.id ? '#6366f115' : 'var(--bg-card)',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <div>
+                <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{role.label}</p>
+                <p style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{role.scope === 'GLOBAL' ? 'Global' : 'Proje'} · {role.permissions?.length ?? 0} yetki</p>
+              </div>
+              {!role.isSystem && (
+                <button onClick={e => { e.stopPropagation(); deleteMutation.mutate(role.id); }}
+                  style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16 }}>x</button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div>
+        {!selectedRole ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-secondary)', fontSize: 13 }}>Sol taraftan bir rol seçin</div>
+        ) : (
+          <div>
+            <div style={{ marginBottom: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{selectedRole.label}</h3>
+              <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                {(selectedRole.isSystem && user?.role !== 'SUPER_ADMIN') ? 'Sistem rolü - sadece Super Admin düzenleyebilir' : saving ? 'Kaydediliyor...' : 'Degisiklikler otomatik kaydedilir'}
+              </p>
+            </div>
+            {groups.map(group => {
+              const groupPerms = scopePerms.filter(([, v]) => v.group === group);
+              return (
+                <div key={group} style={{ marginBottom: 16 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>{group}</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    {groupPerms.map(([key, val]) => (
+                      <label key={key} style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px', borderRadius: 6,
+                        cursor: (selectedRole.isSystem && user?.role !== 'SUPER_ADMIN') ? 'default' : 'pointer',
+                        background: selectedPerms.has(key) ? '#6366f110' : 'transparent',
+                        border: `1px solid ${selectedPerms.has(key) ? '#6366f130' : 'transparent'}`,
+                      }}>
+                        <input type="checkbox" checked={selectedPerms.has(key)} onChange={() => togglePermission(key)}
+                          disabled={selectedRole.isSystem && user?.role !== 'SUPER_ADMIN'} style={{ accentColor: '#6366f1' }} />
+                        <span style={{ fontSize: 12, color: 'var(--text-primary)', flex: 1 }}>{val.label}</span>
+                        <span style={{ fontSize: 10, color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{key}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 function MailSettingsSection({ projectId }: { projectId: string }) {
   const qc = useQueryClient();
