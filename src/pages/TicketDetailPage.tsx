@@ -369,7 +369,6 @@ function CloseModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void }
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const [approvalSent, setApprovalSent] = useState(false);
-
   const OUTCOMES = [
     { value: 'SATISFIED', label: 'Müşteri memnun' },
     { value: 'DISSATISFIED', label: 'Müşteri memnun değil' },
@@ -378,91 +377,69 @@ function CloseModal({ ticket, onClose }: { ticket: Ticket; onClose: () => void }
     { value: 'DUPLICATE', label: 'Mükerrer ticket' },
     { value: 'NO_ACTION_REQUIRED', label: 'İşlem gerekmedi' },
   ];
-
   const mutation = useMutation({
-    mutationFn: () => ticketsApi.close(ticket.id, {
-      closureOutcome: outcome,
-      note: note || undefined,
-    }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['ticket', ticket.id] });
-      onClose();
-    },
+    mutationFn: () => ticketsApi.close(ticket.id, { closureOutcome: outcome, note: note || undefined }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['ticket', ticket.id] }); onClose(); },
     onError: (err: any) => {
+      try {
+        const msg = err?.response?.data?.message;
+        const raw = Array.isArray(msg) ? msg[0] : msg;
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : null;
+        if (parsed?.code === 'APPROVAL_REQUIRED') {
+          setApprovalSent(true);
+          qc.invalidateQueries({ queryKey: ['ticket', ticket.id] });
+          qc.invalidateQueries({ queryKey: ['ticket-approvals', ticket.id] });
+          return;
+        }
+      } catch {}
       setError(err?.response?.data?.message?.[0] ?? err?.message ?? 'Bir hata oluştu');
     },
   });
 
   return (
     <ModalShell title="Ticket'ı Kapat" onClose={onClose}>
-      {/* Onay gönderildi */}
       {approvalSent ? (
         <div style={{ padding: 20, textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
           <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>Onay Talebi Gönderildi</p>
-          <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 16 }}>Bu ticket onay gerektiriyor. Supervisor onayladığında ticket kapanacak.</p>
-          <button onClick={onClose} style={primaryBtnStyle}>Tamam</button>
-        </div>
-      ) : (
-      <>
-      {/* Uyarı */}
-      <div style={{ padding: '10px 14px', borderRadius: 8, background: '#ef444410', border: '1px solid #ef444430', fontSize: 12, color: '#ef4444', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <AlertTriangle size={14} style={{ flexShrink: 0 }} />
-        Bu işlem geri alınamaz. Ticket kapatılacak.
-      </div>
-
-      {approvalSent ? (
-        <div style={{ padding: 20, textAlign: 'center' }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>✅ Onay Talebi Gönderildi</p>
           <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 16 }}>Supervisor onayladığında ticket kapanacak.</p>
           <button onClick={onClose} style={primaryBtnStyle}>Tamam</button>
         </div>
-      ) : (<>
-      {/* Kapanış sonucu */}
-      <label style={labelStyle}>Kapanış Sonucu *</label>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-        {OUTCOMES.map(o => (
-          <label key={o.value} style={{
-            display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-            borderRadius: 8, border: `1px solid ${outcome === o.value ? '#6366f1' : 'var(--border)'}`,
-            background: outcome === o.value ? '#6366f110' : 'transparent',
-            cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)',
-          }}>
-            <input
-              type="radio" name="outcome" value={o.value}
-              checked={outcome === o.value}
-              onChange={() => setOutcome(o.value)}
-              style={{ accentColor: '#6366f1' }}
-            />
-            {o.label}
-          </label>
-        ))}
-      </div>
-
-      {/* Not */}
-      <label style={labelStyle}>Not (opsiyonel)</label>
-      <textarea
-        value={note} onChange={e => setNote(e.target.value)}
-        rows={3} placeholder="Kapanış notu ekle…"
-        style={{ ...inputStyle, resize: 'none' }}
-      />
-
-      {error && (
-        <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: '#ef444415', border: '1px solid #ef444430', fontSize: 12, color: '#ef4444' }}>
-          {error}
-        </div>
+      ) : (
+        <>
+          <div style={{ padding: '10px 14px', borderRadius: 8, background: '#ef444410', border: '1px solid #ef444430', fontSize: 12, color: '#ef4444', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+            Bu işlem geri alınamaz. Ticket kapatılacak.
+          </div>
+          <label style={labelStyle}>Kapanış Sonucu *</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+            {OUTCOMES.map(o => (
+              <label key={o.value} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                borderRadius: 8, border: `1px solid ${outcome === o.value ? '#6366f1' : 'var(--border)'}`,
+                background: outcome === o.value ? '#6366f110' : 'transparent',
+                cursor: 'pointer', fontSize: 13, color: 'var(--text-primary)',
+              }}>
+                <input type="radio" name="outcome" value={o.value} checked={outcome === o.value} onChange={() => setOutcome(o.value)} style={{ accentColor: '#6366f1' }} />
+                {o.label}
+              </label>
+            ))}
+          </div>
+          <label style={labelStyle}>Not (opsiyonel)</label>
+          <textarea value={note} onChange={e => setNote(e.target.value)} rows={3} placeholder="Kapanış notu ekle…" style={{ ...inputStyle, resize: 'none' }} />
+          {error && (
+            <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 8, background: '#ef444415', border: '1px solid #ef444430', fontSize: 12, color: '#ef4444' }}>
+              {error}
+            </div>
+          )}
+          <button onClick={() => { setError(''); mutation.mutate(); }} disabled={mutation.isPending} style={{ ...primaryBtnStyle, background: '#ef4444', marginTop: 16 }}>
+            {mutation.isPending
+              ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Spinner size={14} /> Kapatılıyor…</span>
+              : "Ticket'ı Kapat"
+            }
+          </button>
+        </>
       )}
-
-      <button
-        onClick={() => { setError(''); mutation.mutate(); }}
-        disabled={mutation.isPending}
-        style={{ ...primaryBtnStyle, background: '#ef4444', marginTop: 16 }}
-      >
-        {mutation.isPending
-          ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Spinner size={14} /> Kapatılıyor…</span>
-          : "Ticket'ı Kapat"
-        }
-      </button>
     </ModalShell>
   );
 }
@@ -2390,6 +2367,7 @@ export default function TicketDetailPage() {
 
   const canEdit = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' ||
     user?.role === 'SUPERVISOR' || projectRole === 'ADMIN' || projectRole === 'SUPERVISOR' ||
+    projectRole === 'AGENT' ||
     ticket?.assigneeId === user?.id ||
     ticket?.ownerId === user?.id;
 
