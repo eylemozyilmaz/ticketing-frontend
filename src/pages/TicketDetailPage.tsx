@@ -1336,7 +1336,14 @@ function CustomerPanel({ ticket }: { ticket: Ticket }) {
                 disabled={statusMutation.isPending}
                 style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, background: 'var(--bg-card)', color: 'var(--text-primary)', cursor: 'pointer' }}
               >
-                {statuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                {statuses
+                  .filter((s: any) => {
+                    // SUPER_ADMIN ve ADMIN tüm statüleri görebilir
+                    if (user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || projectRole === 'ADMIN') return true;
+                    // Diğerleri sistem statülerini (Kapalı, Birleştirildi vb.) seçemez
+                    return !s.isClosed;
+                  })
+                  .map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             ) : (
               <StatusBadge status={ticket.status} />
