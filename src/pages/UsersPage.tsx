@@ -433,6 +433,7 @@ export default function UsersPage() {
                           <div style={{ display: 'flex', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 10, color: '#6366f1', background: '#6366f115', padding: '1px 6px', borderRadius: 999 }}>{m.role}</span>
                             {m.department && <span style={{ fontSize: 10, color: 'var(--text-secondary)', background: 'var(--bg-card)', padding: '1px 6px', borderRadius: 999 }}>{m.department.name}</span>}
+                            {m.maxCompensationTl && <span style={{ fontSize: 10, color: '#f59e0b', background: '#f59e0b15', padding: '1px 6px', borderRadius: 999 }}>Limit: {m.maxCompensationTl} TL</span>}
                           </div>
                         </div>
                         {isAdmin && (
