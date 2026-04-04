@@ -1638,7 +1638,7 @@ function ReplyEditor({ ticket, initialCc = '', replyToMsg, onSent }: {
   replyToMsg?: TicketMessage;
   onSent?: () => void;
 }) {
-  const [mode, setMode] = useState<'reply' | 'internal'>('reply');
+  const [mode, setMode] = useState<'reply' | 'internal' | 'history'>('reply');
   const [draft, setDraft] = useState('');
   const [cc, setCc] = useState(initialCc);
   const [files, setFiles] = useState<File[]>([]);
@@ -1690,7 +1690,11 @@ function ReplyEditor({ ticket, initialCc = '', replyToMsg, onSent }: {
     },
   });
 
-  if (ticket.closedAt) return null;
+  if (ticket.closedAt) return (
+    <div style={{ border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', background: 'var(--bg-card)' }}>
+      <TicketHistory ticketId={ticket.id} />
+    </div>
+  );
 
   return (
     <div style={{ border: `1px solid ${replyToMsg ? '#6366f1' : 'var(--border)'}`, borderRadius: 12, overflow: 'hidden', background: 'var(--bg-card)' }}>
@@ -1707,9 +1711,13 @@ function ReplyEditor({ ticket, initialCc = '', replyToMsg, onSent }: {
         <button onClick={() => setMode('internal')} style={{ padding: '10px 16px', fontSize: 12, fontWeight: 500, border: 'none', borderBottom: `2px solid ${mode === 'internal' ? '#f59e0b' : 'transparent'}`, color: mode === 'internal' ? '#f59e0b' : 'var(--text-secondary)', background: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <Lock size={13} /> Ic Not
         </button>
+        <button onClick={() => setMode('history')} style={{ padding: '10px 16px', fontSize: 12, fontWeight: 500, border: 'none', borderBottom: `2px solid ${mode === 'history' ? '#6366f1' : 'transparent'}`, color: mode === 'history' ? '#6366f1' : 'var(--text-secondary)', background: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <Clock size={13} /> Gecmis
+        </button>
       </div>
 
-      {isChild && mode === 'reply' && (
+      {mode === 'history' && <TicketHistory ticketId={ticket.id} />}
+      {isChild && mode === 'reply' && mode !== 'history' && (
         <div style={{ padding: '8px 14px', background: '#f59e0b10', borderBottom: '1px solid #f59e0b30', fontSize: 11, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 6 }}>
           <AlertTriangle size={12} /> Child ticketlarda musteriye dogrudan yanit gonderilemez. Ic not kullanin.
         </div>
@@ -1723,12 +1731,12 @@ function ReplyEditor({ ticket, initialCc = '', replyToMsg, onSent }: {
         </div>
       )}
 
-      <textarea value={draft} onChange={e => setDraft(e.target.value)}
+      {mode !== 'history' && <textarea value={draft} onChange={e => setDraft(e.target.value)}
         disabled={(isChild && mode === 'reply') || sendMutation.isPending}
         placeholder={isChild && mode === 'reply' ? '(Yanit devre disi)' : mode === 'internal' ? 'Ic not - musteri gormez...' : 'Musteriye yanit yaz...'}
         rows={4}
         style={{ width: '100%', padding: '12px 14px', resize: 'none', border: 'none', fontSize: 13, color: 'var(--text-primary)', background: 'transparent', outline: 'none', lineHeight: 1.6, boxSizing: 'border-box' }}
-      />
+      />}
 
       {/* Eklenen dosyalar */}
       {files.length > 0 && (
@@ -1757,12 +1765,47 @@ function ReplyEditor({ ticket, initialCc = '', replyToMsg, onSent }: {
             onChange={e => { setFiles(prev => [...prev, ...Array.from(e.target.files || [])]); e.target.value = ''; }} />
           <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{draft.length > 0 ? `${draft.length} karakter` : ''}</span>
         </div>
-        <button onClick={() => sendMutation.mutate()}
+        {mode !== 'history' && <button onClick={() => sendMutation.mutate()}
           disabled={!draft.trim() || sendMutation.isPending || (isChild && mode === 'reply')}
           style={{ padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#fff', background: mode === 'internal' ? '#f59e0b' : '#6366f1', opacity: (!draft.trim() || (isChild && mode === 'reply')) ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}>
           {sendMutation.isPending ? <><Spinner size={12} /> Gonderiliyor</> : mode === 'internal' ? <><Plus size={13} /> Not Ekle</> : <><Send size={13} /> Gonder</>}
-        </button>
+        </button>}
       </div>
+    </div>
+  );
+}
+
+
+// ─────────────────────────────────────────────
+// ORTA PANEL: GEÇMİŞ
+// ─────────────────────────────────────────────
+const HISTORY_ICONS: Record<string, string> = {
+  status: '🔄', message: '💬', resolution: '✅', approval: '🔐', transfer: '📦',
+};
+
+function TicketHistory({ ticketId }: { ticketId: string }) {
+  const { data: res, isLoading } = useQuery({
+    queryKey: ['ticket-history', ticketId],
+    queryFn: () => api.get(`/tickets/${ticketId}/history`),
+    staleTime: 0,
+  });
+  const history: any[] = res?.data?.data ?? res?.data ?? [];
+  if (isLoading) return <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-secondary)', fontSize: 12 }}>Yukleniyor...</div>;
+  if (history.length === 0) return <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-secondary)', fontSize: 12 }}>Gecmis kaydi yok.</div>;
+  return (
+    <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {history.map((h: any, i: number) => (
+        <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+          <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>{HISTORY_ICONS[h.type] ?? '📌'}</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 500 }}>{h.description}</p>
+            <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
+              {h.actor ? `${h.actor.firstName} ${h.actor.lastName}` : 'Sistem'}
+              {h.date && ` · ${new Date(h.date).toLocaleString('tr-TR')}`}
+            </p>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -2206,38 +2249,73 @@ function ResolutionsWidget({ ticketId }: { ticketId: string }) {
   );
 }
 
-function ApprovalsWidget({ ticketId }: { ticketId: string }) {
-  const { data: res } = useQuery({
+function ApprovalsWidget({ ticketId, canEdit }: { ticketId: string; canEdit: boolean }) {
+  const qc = useQueryClient();
+  const { data: res, isLoading } = useQuery({
     queryKey: ['ticket-approvals', ticketId],
     queryFn: () => ticketsApi.getApprovals(ticketId),
+    staleTime: 0,
   });
-  const approvals: any[] = res?.data?.data ?? [];
-  if (approvals.length === 0) return null;
+  const approvals: any[] = res?.data?.data ?? res?.data ?? [];
+
+  const requestMutation = useMutation({
+    mutationFn: () => api.post('/approvals/request', { ticketId, requestType: 'TICKET_CLOSE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['ticket-approvals', ticketId] }),
+  });
+
+  const hasPending = approvals.some((a: any) => a.status === 'PENDING');
+  if (isLoading) return null;
+  if (approvals.length === 0 && !canEdit) return null;
 
   return (
     <div style={{ border: '1px solid var(--border)', borderRadius: 12, padding: 14, background: 'var(--bg-card)' }}>
-      <SectionLabel>Onay Zinciri</SectionLabel>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {approvals.map((a: any) => (
-          <div key={a.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <span style={{ marginTop: 1, flexShrink: 0 }}>
-              {a.decision === 'approved'
-                ? <CheckCircle size={15} color="#10b981" />
-                : a.decision === 'rejected'
-                ? <XCircle size={15} color="#ef4444" />
-                : <Clock size={15} color="#f59e0b" />}
-            </span>
-            <div>
-              <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
-                {a.approverName ?? a.approver_name ?? `${a.approver?.firstName ?? ''} ${a.approver?.lastName ?? ''}`.trim()}
+      <SectionLabel>Onay Gecmisi</SectionLabel>
+      {approvals.length === 0 ? (
+        <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>Henuz onay talebi yok.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+          {approvals.map((a: any) => (
+            <div key={a.id} style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {a.status === 'APPROVED' ? <CheckCircle size={13} color="#10b981" /> : a.status === 'REJECTED' ? <XCircle size={13} color="#ef4444" /> : <Clock size={13} color="#f59e0b" />}
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {a.requestType === 'TICKET_CLOSE' ? 'Kapama Onayi' : 'Kompanzasyon Onayi'}
+                  </span>
+                </div>
+                <span style={{
+                  fontSize: 10, padding: '2px 6px', borderRadius: 10,
+                  background: a.status === 'APPROVED' ? 'rgba(16,185,129,0.1)' : a.status === 'REJECTED' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
+                  color: a.status === 'APPROVED' ? '#10b981' : a.status === 'REJECTED' ? '#ef4444' : '#f59e0b',
+                }}>
+                  {a.status === 'APPROVED' ? 'Onaylandi' : a.status === 'REJECTED' ? 'Reddedildi' : 'Bekliyor'}
+                </span>
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                Talep: {a.requestedBy ? `${a.requestedBy.firstName} ${a.requestedBy.lastName}` : '-'}
+                {a.createdAt && ` - ${new Date(a.createdAt).toLocaleDateString('tr-TR')}`}
               </p>
-              <p style={{ fontSize: 10, color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{a.level}</p>
-              {a.comment && <p style={{ fontSize: 10, color: 'var(--text-secondary)', fontStyle: 'italic', marginTop: 2 }}>"{a.comment}"</p>}
-              {!a.decision && <p style={{ fontSize: 10, color: '#f59e0b', marginTop: 2 }}>Bekleniyor…</p>}
+              {a.actor && (
+                <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                  Islem: {`${a.actor.firstName} ${a.actor.lastName}`}
+                  {a.resolvedAt && ` - ${new Date(a.resolvedAt).toLocaleDateString('tr-TR')}`}
+                </p>
+              )}
+              {a.note && (
+                <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 6, borderLeft: `3px solid ${a.status === 'REJECTED' ? '#ef4444' : '#6366f1'}`, background: a.status === 'REJECTED' ? 'rgba(239,68,68,0.08)' : 'var(--bg-secondary)' }}>
+                  <p style={{ fontSize: 11, color: a.status === 'REJECTED' ? '#ef4444' : 'var(--text-secondary)', fontStyle: 'italic' }}>"{a.note}"</p>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
+      {canEdit && !hasPending && (
+        <button onClick={() => requestMutation.mutate()} disabled={requestMutation.isPending}
+          style={{ width: '100%', padding: '7px 0', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer' }}>
+          {requestMutation.isPending ? 'Gonderiliyor...' : '+ Kapama Onayi Talep Et'}
+        </button>
+      )}
     </div>
   );
 }

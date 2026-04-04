@@ -986,7 +986,7 @@ function ResolutionTypesSection({ projectId }: { projectId: string }) {
 // BÖLÜM: DEPARTMANLAR
 // ─────────────────────────────────────────────
 
-function RolesSection() {
+function RolesSection({ projectId }: { projectId: string }) {
   const qc = useQueryClient();
   const { user } = useAuthStore();
   const [selectedRoleId, setSelectedRoleId] = useState(null);
@@ -1004,7 +1004,7 @@ function RolesSection() {
   const selectedPerms = new Set((selectedRole?.permissions ?? []).map((p) => p.permissionKey));
 
   const createMutation = useMutation({
-    mutationFn: () => api.post('/roles', newRole),
+    mutationFn: () => api.post('/roles', { ...newRole, projectId: newRole.scope === 'PROJECT' ? projectId : undefined }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['roles'] }); setShowNewRole(false); setNewRole({ name: '', label: '', scope: 'PROJECT' }); },
   });
 
@@ -1472,7 +1472,7 @@ export default function SettingsPage() {
         {activeSection === 'resolution-types' && <ResolutionTypesSection projectId={projectId} />}
         {activeSection === 'departments' && <DepartmentsSection projectId={projectId} />}
         {activeSection === 'mail' && <MailSettingsSection projectId={projectId} />}
-        {activeSection === 'roles' && <RolesSection />}
+        {activeSection === 'roles' && <RolesSection projectId={projectId} />}
       </div>
     </div>
   );
