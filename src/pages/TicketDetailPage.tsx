@@ -1122,7 +1122,8 @@ function PlaceholderModal({ type, onClose }: { type: string; onClose: () => void
 // ─────────────────────────────────────────────
 
 function CustomerPanel({ ticket }: { ticket: Ticket }) {
-  const { statuses } = useProjectStore();
+  const { statuses, projectRole } = useProjectStore();
+  const { user } = useAuthStore();
   const qc = useQueryClient();
   const [erpOpen, setErpOpen] = useState(false);
   const [showAllContracts, setShowAllContracts] = useState(false);
@@ -1329,7 +1330,7 @@ function CustomerPanel({ ticket }: { ticket: Ticket }) {
           {/* Statü değiştirme — statuses store'dan geliyorsa dropdown, yoksa badge */}
           <div>
             <p style={{ fontSize: 10, color: 'var(--text-secondary)', marginBottom: 4 }}>Statü</p>
-            {statuses.length > 0 ? (
+            {statuses.length > 0 && !(ticket.closedAt && (projectRole === 'AGENT' || projectRole === 'READONLY')) ? (
               <select
                 value={ticket.status?.id ?? ticket.statusId ?? ''}
                 onChange={e => statusMutation.mutate(e.target.value)}
@@ -1338,10 +1339,8 @@ function CustomerPanel({ ticket }: { ticket: Ticket }) {
               >
                 {statuses
                   .filter((s: any) => {
-                    // SUPER_ADMIN ve ADMIN tüm statüleri görebilir
                     if (user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN' || projectRole === 'ADMIN') return true;
-                    // Diğerleri sistem statülerini (Kapalı, Birleştirildi vb.) seçemez
-                    return !s.isClosed;
+                    return !s.isClosed && !s.isInitial;
                   })
                   .map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>

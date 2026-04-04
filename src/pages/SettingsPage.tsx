@@ -111,6 +111,9 @@ function GeneralSection({ projectId }: { projectId: string }) {
     autoReplyEnabled: false,
     autoReplyMessage: '',
     isTemporarilyClosed: false,
+    approvalRequiredForVip: false,
+    approvalRequiredForResolutionType: false,
+    approvalRequiredForCompensationLimit: false,
     reopenAt: '',
     workingHours: {} as Record<string, { start: string; end: string; isOpen: boolean }>,
   });
@@ -127,6 +130,9 @@ function GeneralSection({ projectId }: { projectId: string }) {
       autoReplyEnabled: project.autoReplyEnabled ?? false,
       autoReplyMessage: project.autoReplyMessage ?? '',
       isTemporarilyClosed: project.isTemporarilyClosed ?? false,
+      approvalRequiredForVip: project.approvalRequiredForVip ?? false,
+      approvalRequiredForResolutionType: project.approvalRequiredForResolutionType ?? false,
+      approvalRequiredForCompensationLimit: project.approvalRequiredForCompensationLimit ?? false,
       reopenAt: project.reopenAt ? new Date(project.reopenAt).toISOString().slice(0, 16) : '',
       workingHours: project.workingHours ?? {
         mon: { start: '09:00', end: '18:00', isOpen: true },
@@ -165,6 +171,9 @@ function GeneralSection({ projectId }: { projectId: string }) {
       temporaryClosureMessage: form.temporaryClosureMessage || undefined,
       autoReplyEnabled: form.autoReplyEnabled,
       autoReplyMessage: form.autoReplyMessage || undefined,
+      approvalRequiredForVip: form.approvalRequiredForVip,
+      approvalRequiredForResolutionType: form.approvalRequiredForResolutionType,
+      approvalRequiredForCompensationLimit: form.approvalRequiredForCompensationLimit,
       isTemporarilyClosed: form.isTemporarilyClosed,
       reopenAt: form.reopenAt ? new Date(form.reopenAt).toISOString() : undefined,
       workingHours: form.workingHours,
@@ -336,6 +345,44 @@ function GeneralSection({ projectId }: { projectId: string }) {
         )}
       </div>
 
+      {/* Onay Kuralları */}
+      <div style={{ ...card, marginTop: 16 }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>Onay Kuralları</p>
+        <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 12 }}>Hangi durumlarda supervisor onayı gereksin?</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.approvalRequiredForVip}
+              onChange={e => setField('approvalRequiredForVip', e.target.checked)}
+              style={{ accentColor: '#6366f1' }} />
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>VIP Müşteri</p>
+              <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>VIP müşterilerin ticketları kapatılmadan önce onay gerektirir</p>
+            </div>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.approvalRequiredForResolutionType}
+              onChange={e => setField('approvalRequiredForResolutionType', e.target.checked)}
+              style={{ accentColor: '#6366f1' }} />
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Onaya Tabi Çözüm Seti</p>
+              <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>"Onaya Tabi" işaretli çözüm setleri onay gerektirir</p>
+            </div>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.approvalRequiredForCompensationLimit}
+              onChange={e => setField('approvalRequiredForCompensationLimit', e.target.checked)}
+              style={{ accentColor: '#6366f1' }} />
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>Kompanzasyon Limiti</p>
+              <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Agent limitini aşan tutar onay gerektirir</p>
+            </div>
+          </label>
+        </div>
+        <button onClick={() => mutation.mutate()} disabled={mutation.isPending}
+          style={{ ...btnPrimary, marginTop: 14 }}>
+          {mutation.isPending ? 'Kaydediliyor…' : 'Kaydet'}
+        </button>
+      </div>
       {/* Tehlikeli Alan — sadece SUPER_ADMIN */}
       {user?.role === 'SUPER_ADMIN' && <DangerZone projectId={projectId} />}
     </div>
